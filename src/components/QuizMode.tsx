@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from 'react'
 import { useAppContext } from '../hooks/useAppData'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import { MarkdownImage } from './MarkdownImage'
 
 export function QuizMode() {
   const { cards, selectedDeckId, setView } = useAppContext()
@@ -130,7 +131,7 @@ export function QuizMode() {
 
       <div className="w-full max-w-lg bg-white rounded-xl shadow-lg border border-gray-200 p-6 mb-6 dark:bg-gray-800 dark:border-gray-700">
         <div className="prose prose-sm max-w-none mb-6 dark:prose-invert">
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>{current.front}</ReactMarkdown>
+          <ReactMarkdown remarkPlugins={[remarkGfm]} components={{ img: MarkdownImage }}>{current.front}</ReactMarkdown>
         </div>
 
         <div className="space-y-3">

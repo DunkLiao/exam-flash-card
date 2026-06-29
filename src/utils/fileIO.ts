@@ -17,6 +17,18 @@ export async function deleteUnusedImages(usedPaths: string[]): Promise<void> {
   return invoke('delete_unused_images', { usedPaths })
 }
 
+export async function getAppDataDir(): Promise<string> {
+  return invoke<string>('get_app_data_dir')
+}
+
+export async function openImageDialog(): Promise<string | null> {
+  return invoke<string | null>('open_image_dialog')
+}
+
+export async function getImageBase64(filename: string): Promise<string> {
+  return invoke<string>('get_image_base64', { filename })
+}
+
 export async function openFileDialog(): Promise<string | null> {
   return invoke<string | null>('open_file_dialog')
 }

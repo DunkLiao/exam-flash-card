@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useCallback, useEffect } from 'react'
 import type { AppData, Deck, Card, View } from '../types'
-import { loadData, saveData } from '../utils/fileIO'
+import { loadData, saveData, deleteUnusedImages } from '../utils/fileIO'
 
 function generateId(): string {
   return crypto.randomUUID()
@@ -54,6 +54,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     refreshData()
   }, [refreshData])
+
+  useEffect(() => {
+    if (loading || data.cards.length === 0) return
+    const used = new Set<string>()
+    const re = /!\[.*?\]\(images\/([^)]+)\)/g
+    for (const card of data.cards) {
+      let m: RegExpExecArray | null
+      while ((m = re.exec(card.front)) !== null) used.add(m[1])
+      re.lastIndex = 0
+      while ((m = re.exec(card.back)) !== null) used.add(m[1])
+      re.lastIndex = 0
+    }
+    deleteUnusedImages(Array.from(used)).catch(() => {})
+  }, [loading, data.cards])
 
   const persist = useCallback(async (newData: AppData) => {
     setData(newData)

@@ -9,6 +9,7 @@ export function DeckView() {
   const [showEditor, setShowEditor] = useState(false)
   const [editingCard, setEditingCard] = useState<Card | null>(null)
   const [previewCard, setPreviewCard] = useState<Card | null>(null)
+  const [previewFlipped, setPreviewFlipped] = useState(false)
 
   const deck = decks.find((d) => d.id === selectedDeckId)
   const deckCards = cards.filter((c) => c.deckId === selectedDeckId)
@@ -37,7 +38,7 @@ export function DeckView() {
     return (
       <div className="flex-1 flex flex-col items-center justify-center p-8 page-enter">
         <button
-          onClick={() => setPreviewCard(null)}
+          onClick={() => { setPreviewCard(null); setPreviewFlipped(false) }}
           className="self-start mb-4 text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
         >
           ← 回到卡片列表
@@ -45,10 +46,12 @@ export function DeckView() {
         <FlipCard
           front={previewCard.front}
           back={previewCard.back}
-          flipped={false}
-          onFlip={() => {}}
+          flipped={previewFlipped}
+          onFlip={() => setPreviewFlipped(!previewFlipped)}
         />
-        <p className="mt-4 text-sm text-gray-400">點擊卡片翻面</p>
+        {!previewFlipped && (
+          <p className="mt-4 text-sm text-gray-400">點擊卡片翻面</p>
+        )}
       </div>
     )
   }

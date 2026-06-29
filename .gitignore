@@ -11,7 +11,10 @@ src-tauri/target/
 src-tauri/.cargo/
 
 # Portable package output
-portable/
+portable/*
+!portable/FlashCard/
+portable/FlashCard/*
+!portable/FlashCard/.gitkeep
 
 # Logs
 logs/

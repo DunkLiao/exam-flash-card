@@ -52,6 +52,14 @@ fn get_images_dir(app: &tauri::AppHandle) -> PathBuf {
 }
 
 #[tauri::command]
+fn get_app_data_dir(app: tauri::AppHandle) -> Result<String, String> {
+    let path = get_data_dir(&app);
+    path.to_str()
+        .map(|s| s.to_string())
+        .ok_or_else(|| "Failed to convert path".to_string())
+}
+
+#[tauri::command]
 fn load_data(app: tauri::AppHandle) -> Result<AppData, String> {
     let path = get_data_file(&app);
     if !path.exists() {
@@ -84,6 +92,52 @@ fn save_image(app: tauri::AppHandle, data: Vec<u8>, filename: String) -> Result<
 }
 
 #[tauri::command]
+fn get_image_base64(app: tauri::AppHandle, filename: String) -> Result<String, String> {
+    let dir = get_images_dir(&app);
+    let safe_name = filename
+        .chars()
+        .filter(|c| c.is_alphanumeric() || *c == '.' || *c == '-' || *c == '_')
+        .collect::<String>();
+    let path = dir.join(&safe_name);
+    let bytes = fs::read(&path).map_err(|e| format!("Failed to read image: {}", e))?;
+    let ext = safe_name.split('.').last().unwrap_or("png").to_lowercase();
+    let mime = match ext.as_str() {
+        "jpg" | "jpeg" => "image/jpeg",
+        "png" => "image/png",
+        "gif" => "image/gif",
+        "webp" => "image/webp",
+        "bmp" => "image/bmp",
+        "svg" => "image/svg+xml",
+        _ => "image/png",
+    };
+    Ok(format!("data:{};base64,{}", mime, base64_encode(&bytes)))
+}
+
+fn base64_encode(data: &[u8]) -> String {
+    const CHARS: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut result = String::new();
+    for chunk in data.chunks(3) {
+        let b0 = chunk[0] as u32;
+        let b1 = if chunk.len() > 1 { chunk[1] as u32 } else { 0 };
+        let b2 = if chunk.len() > 2 { chunk[2] as u32 } else { 0 };
+        let triple = (b0 << 16) | (b1 << 8) | b2;
+        result.push(CHARS[((triple >> 18) & 0x3F) as usize] as char);
+        result.push(CHARS[((triple >> 12) & 0x3F) as usize] as char);
+        if chunk.len() > 1 {
+            result.push(CHARS[((triple >> 6) & 0x3F) as usize] as char);
+        } else {
+            result.push('=');
+        }
+        if chunk.len() > 2 {
+            result.push(CHARS[(triple & 0x3F) as usize] as char);
+        } else {
+            result.push('=');
+        }
+    }
+    result
+}
+
+#[tauri::command]
 fn delete_unused_images(app: tauri::AppHandle, used_paths: Vec<String>) -> Result<(), String> {
     let dir = get_images_dir(&app);
     if !dir.exists() {
@@ -107,6 +161,17 @@ async fn open_file_dialog(app: tauri::AppHandle) -> Result<Option<String>, Strin
         .file()
         .add_filter("Flashcard Files", &["json", "csv"])
         .add_filter("All Files", &["*"])
+        .blocking_pick_file();
+
+    Ok(file.map(|f| f.to_string()))
+}
+
+#[tauri::command]
+async fn open_image_dialog(app: tauri::AppHandle) -> Result<Option<String>, String> {
+    let file = app
+        .dialog()
+        .file()
+        .add_filter("Images", &["png", "jpg", "jpeg", "gif", "webp", "bmp", "svg"])
         .blocking_pick_file();
 
     Ok(file.map(|f| f.to_string()))
@@ -153,7 +218,10 @@ pub fn run() {
             save_data,
             save_image,
             delete_unused_images,
+            get_image_base64,
+            get_app_data_dir,
             open_file_dialog,
+            open_image_dialog,
             save_file_dialog,
             export_to_file,
             read_import_file,
