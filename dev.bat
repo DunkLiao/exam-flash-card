@@ -1,7 +1,8 @@
 @echo off
+chcp 65001 >nul
 cd /d "%~dp0"
 echo ================================
-echo   FlashCard - 開發模式 (HMR)
+echo   FlashCard - dev mode (HMR)
 echo ================================
 echo.
 call npm run tauri:dev
