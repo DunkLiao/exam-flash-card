@@ -13,6 +13,10 @@ export async function saveImage(data: number[], filename: string): Promise<strin
   return invoke<string>('save_image', { data, filename })
 }
 
+export async function importImageFile(path: string, filename: string): Promise<string> {
+  return invoke<string>('import_image_file', { path, filename })
+}
+
 export async function deleteUnusedImages(usedPaths: string[]): Promise<void> {
   return invoke('delete_unused_images', { usedPaths })
 }

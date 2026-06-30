@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useCallback, useEffect } from 'react'
 import type { AppData, Deck, Card, View } from '../types'
 import { loadData, saveData, deleteUnusedImages } from '../utils/fileIO'
+import { collectImageFilenames, shouldCleanupImagesAfterChange, type ImageCleanupChange } from '../utils/imageRefs'
 
 function generateId(): string {
   return crypto.randomUUID()
@@ -55,20 +56,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     refreshData()
   }, [refreshData])
 
-  useEffect(() => {
-    if (loading || data.cards.length === 0) return
-    const used = new Set<string>()
-    const re = /!\[.*?\]\(images\/([^)]+)\)/g
-    for (const card of data.cards) {
-      let m: RegExpExecArray | null
-      while ((m = re.exec(card.front)) !== null) used.add(m[1])
-      re.lastIndex = 0
-      while ((m = re.exec(card.back)) !== null) used.add(m[1])
-      re.lastIndex = 0
-    }
-    deleteUnusedImages(Array.from(used)).catch(() => {})
-  }, [loading, data.cards])
-
   const persist = useCallback(async (newData: AppData) => {
     setData(newData)
     try {
@@ -76,6 +63,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     } catch {
       // silent fail - data stays in state
     }
+  }, [])
+
+  const cleanupImages = useCallback((cards: Card[], change: ImageCleanupChange) => {
+    if (!shouldCleanupImagesAfterChange(change)) return
+    deleteUnusedImages(collectImageFilenames(cards)).catch(() => {})
   }, [])
 
   const addDeck = useCallback((name: string, description: string) => {
@@ -103,11 +95,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       cards: data.cards.filter((c) => c.deckId !== id),
     }
     persist(newData)
+    cleanupImages(newData.cards, 'deleteDeck')
     if (selectedDeckId === id) {
       setSelectedDeckId(null)
       setView('decks')
     }
-  }, [data, persist, selectedDeckId])
+  }, [cleanupImages, data, persist, selectedDeckId])
 
   const addCard = useCallback((front: string, back: string, deckId: string) => {
     const now = new Date().toISOString().split('T')[0]
@@ -132,7 +125,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       cards: data.cards.map((c) => (c.id === id ? { ...c, front, back } : c)),
     }
     persist(newData)
-  }, [data, persist])
+    cleanupImages(newData.cards, 'updateCard')
+  }, [cleanupImages, data, persist])
 
   const deleteCard = useCallback((id: string) => {
     const newData = {
@@ -140,7 +134,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       cards: data.cards.filter((c) => c.id !== id),
     }
     persist(newData)
-  }, [data, persist])
+    cleanupImages(newData.cards, 'deleteCard')
+  }, [cleanupImages, data, persist])
 
   const updateCardSRS = useCallback((id: string, updates: Partial<Card>) => {
     const newData = {

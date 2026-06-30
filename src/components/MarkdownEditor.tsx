@@ -1,8 +1,7 @@
 import { useState, useRef, useCallback } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { readFile } from '@tauri-apps/plugin-fs'
-import { saveImage, openImageDialog } from '../utils/fileIO'
+import { importImageFile, saveImage, openImageDialog } from '../utils/fileIO'
 import { MarkdownImage } from './MarkdownImage'
 
 interface MarkdownEditorProps {
@@ -12,10 +11,25 @@ interface MarkdownEditorProps {
   onBackChange: (v: string) => void
 }
 
-async function insertImageBytes(
-  bytes: Uint8Array,
-  ext: string,
-  target: 'front' | 'back',
+type CardSide = 'front' | 'back'
+
+function normalizeImageExtension(ext: string): string {
+  const value = ext.toLowerCase()
+  if (value === 'svg+xml') return 'svg'
+  if (value === 'jpg' || value === 'jpeg') return value
+  if (['png', 'gif', 'webp', 'bmp', 'svg'].includes(value)) return value
+  return 'png'
+}
+
+function withMarkdownSpacing(before: string, markdown: string, after: string): string {
+  const prefix = before.length > 0 && !before.endsWith('\n') ? '\n\n' : ''
+  const suffix = after.length > 0 && !after.startsWith('\n') ? '\n\n' : ''
+  return `${before}${prefix}${markdown}${suffix}${after}`
+}
+
+function insertImagePath(
+  imagePath: string,
+  target: CardSide,
   front: string,
   back: string,
   onFrontChange: (v: string) => void,
@@ -23,17 +37,17 @@ async function insertImageBytes(
   frontRef: React.RefObject<HTMLTextAreaElement | null>,
   backRef: React.RefObject<HTMLTextAreaElement | null>,
 ) {
-  const filename = `img_${Date.now()}.${ext}`
-  const imagePath = await saveImage(Array.from(bytes), filename)
-  const md = `![image](${imagePath})`
-
   const textarea = target === 'front' ? frontRef.current : backRef.current
   if (!textarea) return
+
+  const md = `![圖片](${imagePath})`
 
   const currentValue = target === 'front' ? front : back
   const start = textarea.selectionStart
   const end = textarea.selectionEnd
-  const newValue = currentValue.substring(0, start) + md + currentValue.substring(end)
+  const before = currentValue.substring(0, start)
+  const after = currentValue.substring(end)
+  const newValue = withMarkdownSpacing(before, md, after)
 
   if (target === 'front') {
     onFrontChange(newValue)
@@ -44,107 +58,157 @@ async function insertImageBytes(
   requestAnimationFrame(() => {
     const el = target === 'front' ? frontRef.current : backRef.current
     if (el) {
-      el.selectionStart = el.selectionEnd = start + md.length
+      const cursor = before.length + (before.length > 0 && !before.endsWith('\n') ? 2 : 0) + md.length
+      el.selectionStart = el.selectionEnd = cursor
       el.focus()
     }
   })
 }
 
+async function insertImageBytes(
+  bytes: Uint8Array,
+  ext: string,
+  target: CardSide,
+  front: string,
+  back: string,
+  onFrontChange: (v: string) => void,
+  onBackChange: (v: string) => void,
+  frontRef: React.RefObject<HTMLTextAreaElement | null>,
+  backRef: React.RefObject<HTMLTextAreaElement | null>,
+) {
+  const filename = `img_${Date.now()}.${normalizeImageExtension(ext)}`
+  const imagePath = await saveImage(Array.from(bytes), filename)
+  insertImagePath(imagePath, target, front, back, onFrontChange, onBackChange, frontRef, backRef)
+}
+
 export function MarkdownEditor({ front, back, onFrontChange, onBackChange }: MarkdownEditorProps) {
   const frontRef = useRef<HTMLTextAreaElement>(null)
   const backRef = useRef<HTMLTextAreaElement>(null)
-  const [uploading, setUploading] = useState(false)
+  const [uploadingTarget, setUploadingTarget] = useState<CardSide | null>(null)
+  const [dragTarget, setDragTarget] = useState<CardSide | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
-  const handleToolbarInsert = useCallback(async (target: 'front' | 'back') => {
-    const path = await openImageDialog()
-    if (!path) return
-    setUploading(true)
+  const insertBytes = useCallback(async (bytes: Uint8Array, ext: string, target: CardSide) => {
+    setUploadingTarget(target)
+    setError(null)
     try {
-      const data = await readFile(path)
-      const ext = path.split('.').pop()?.toLowerCase() || 'png'
-      await insertImageBytes(data, ext, target, front, back, onFrontChange, onBackChange, frontRef, backRef)
+      await insertImageBytes(bytes, ext, target, front, back, onFrontChange, onBackChange, frontRef, backRef)
     } catch (e) {
       console.error('Failed to insert image:', e)
+      setError('圖片插入失敗，請確認檔案格式或再試一次。')
     } finally {
-      setUploading(false)
+      setUploadingTarget(null)
     }
   }, [front, back, onFrontChange, onBackChange])
 
-  const handlePaste = useCallback(async (e: React.ClipboardEvent, target: 'front' | 'back') => {
+  const handleToolbarInsert = useCallback(async (target: CardSide) => {
+    const path = await openImageDialog()
+    if (!path) return
+
+    setUploadingTarget(target)
+    setError(null)
+    try {
+      const ext = path.split('.').pop() || 'png'
+      const filename = `img_${Date.now()}.${normalizeImageExtension(ext)}`
+      const imagePath = await importImageFile(path, filename)
+      insertImagePath(imagePath, target, front, back, onFrontChange, onBackChange, frontRef, backRef)
+    } catch (e) {
+      console.error('Failed to read selected image:', e)
+      setError('無法讀取選取的圖片。')
+    } finally {
+      setUploadingTarget(null)
+    }
+  }, [front, back, onFrontChange, onBackChange])
+
+  const handlePaste = useCallback(async (e: React.ClipboardEvent, target: CardSide) => {
     const items = e.clipboardData?.items
     if (!items) return
+
     for (let i = 0; i < items.length; i++) {
       const item = items[i]
-      if (item.type.startsWith('image/')) {
-        e.preventDefault()
-        const file = item.getAsFile()
-        if (!file) return
-        setUploading(true)
-        try {
-          const buffer = await file.arrayBuffer()
-          const bytes = new Uint8Array(buffer)
-          const ext = item.type.split('/')[1] || 'png'
-          await insertImageBytes(bytes, ext, target, front, back, onFrontChange, onBackChange, frontRef, backRef)
-        } catch (e) {
-          console.error('Failed to paste image:', e)
-        } finally {
-          setUploading(false)
-        }
-        return
-      }
-    }
-  }, [front, back, onFrontChange, onBackChange])
+      if (!item.type.startsWith('image/')) continue
 
-  const handleDragOver = useCallback((e: React.DragEvent) => {
+      e.preventDefault()
+      const file = item.getAsFile()
+      if (!file) return
+
+      const buffer = await file.arrayBuffer()
+      await insertBytes(new Uint8Array(buffer), item.type.split('/')[1] || 'png', target)
+      return
+    }
+  }, [insertBytes])
+
+  const handleDragOver = useCallback((e: React.DragEvent, target: CardSide) => {
     e.preventDefault()
     e.stopPropagation()
+    setDragTarget(target)
   }, [])
 
-  const handleDrop = useCallback(async (e: React.DragEvent, target: 'front' | 'back') => {
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
     e.preventDefault()
     e.stopPropagation()
+    setDragTarget(null)
+  }, [])
+
+  const handleDrop = useCallback(async (e: React.DragEvent, target: CardSide) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setDragTarget(null)
+
     const files = e.dataTransfer?.files
     if (!files || files.length === 0) return
+
     for (let i = 0; i < files.length; i++) {
       const file = files[i]
       if (!file.type.startsWith('image/')) continue
-      setUploading(true)
-      try {
-        const buffer = await file.arrayBuffer()
-        const bytes = new Uint8Array(buffer)
-        const ext = file.name.split('.').pop()?.toLowerCase() || 'png'
-        await insertImageBytes(bytes, ext, target, front, back, onFrontChange, onBackChange, frontRef, backRef)
-      } catch (e) {
-        console.error('Failed to drop image:', e)
-      } finally {
-        setUploading(false)
-      }
+
+      const buffer = await file.arrayBuffer()
+      const ext = file.name.split('.').pop() || file.type.split('/')[1] || 'png'
+      await insertBytes(new Uint8Array(buffer), ext, target)
       return
     }
-  }, [front, back, onFrontChange, onBackChange])
 
-  const imageButton = (target: 'front' | 'back') => (
-    <button
-      type="button"
-      onClick={() => handleToolbarInsert(target)}
-      disabled={uploading}
-      className={`px-2 py-1 text-xs rounded transition-colors ${
-        uploading
-          ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-          : 'bg-gray-100 hover:bg-purple-100 text-gray-500 hover:text-purple-600 dark:bg-gray-700 dark:hover:bg-purple-900/40 dark:text-gray-400 dark:hover:text-purple-400'
-      }`}
-      title="插入圖片"
-    >
-      {uploading ? '⋯' : '🖼'}
-    </button>
-  )
+    setError('請拖放圖片檔案。')
+  }, [insertBytes])
+
+  const imageButton = (target: CardSide) => {
+    const uploading = uploadingTarget === target
+
+    return (
+      <button
+        type="button"
+        onClick={() => handleToolbarInsert(target)}
+        disabled={uploadingTarget !== null}
+        className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+          uploading
+            ? 'cursor-wait bg-gray-100 text-gray-400 dark:bg-gray-700 dark:text-gray-500'
+            : 'bg-gray-100 text-gray-600 hover:bg-purple-100 hover:text-purple-700 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-purple-900/40 dark:hover:text-purple-200'
+        }`}
+        title="插入圖片"
+      >
+        {uploading ? '插入中...' : '插入圖片'}
+      </button>
+    )
+  }
+
+  const textAreaClass = (target: CardSide) => {
+    const active = dragTarget === target
+    return `flex-1 w-full rounded-lg border p-3 text-sm outline-none resize-none transition-colors focus:ring-2 focus:ring-purple-400 ${
+      active
+        ? 'border-purple-400 bg-purple-50 dark:border-purple-500 dark:bg-purple-950/30'
+        : 'border-gray-200 bg-gray-50 dark:border-gray-600 dark:bg-gray-800'
+    } dark:text-white`
+  }
 
   return (
-    <div className="grid grid-cols-2 gap-4 h-full">
+    <div className="grid h-full grid-cols-2 gap-4">
       <div className="flex flex-col gap-4">
-        <div className="flex-1 flex flex-col">
-          <div className="flex items-center justify-between mb-1">
-            <label className="text-xs font-semibold text-gray-400 uppercase">正面（題目）</label>
+        <div className="flex flex-1 flex-col">
+          <div className="mb-1 flex items-center justify-between gap-3">
+            <div>
+              <label className="text-xs font-semibold uppercase text-gray-400">正面（題目）</label>
+              <p className="text-[11px] text-gray-400">可點選、貼上或拖放圖片</p>
+            </div>
             {imageButton('front')}
           </div>
           <textarea
@@ -152,15 +216,19 @@ export function MarkdownEditor({ front, back, onFrontChange, onBackChange }: Mar
             value={front}
             onChange={(e) => onFrontChange(e.target.value)}
             onPaste={(e) => handlePaste(e, 'front')}
-            onDragOver={handleDragOver}
+            onDragOver={(e) => handleDragOver(e, 'front')}
+            onDragLeave={handleDragLeave}
             onDrop={(e) => handleDrop(e, 'front')}
-            className="flex-1 w-full p-3 text-sm bg-gray-50 border border-gray-200 rounded-lg resize-none focus:ring-2 focus:ring-purple-400 focus:border-transparent outline-none dark:bg-gray-800 dark:border-gray-600 dark:text-white"
-            placeholder="使用 Markdown 格式撰寫題目..."
+            className={textAreaClass('front')}
+            placeholder="使用 Markdown 撰寫題目。可直接貼上或拖放圖片。"
           />
         </div>
-        <div className="flex-1 flex flex-col">
-          <div className="flex items-center justify-between mb-1">
-            <label className="text-xs font-semibold text-gray-400 uppercase">反面（答案）</label>
+        <div className="flex flex-1 flex-col">
+          <div className="mb-1 flex items-center justify-between gap-3">
+            <div>
+              <label className="text-xs font-semibold uppercase text-gray-400">反面（答案）</label>
+              <p className="text-[11px] text-gray-400">可點選、貼上或拖放圖片</p>
+            </div>
             {imageButton('back')}
           </div>
           <textarea
@@ -168,26 +236,32 @@ export function MarkdownEditor({ front, back, onFrontChange, onBackChange }: Mar
             value={back}
             onChange={(e) => onBackChange(e.target.value)}
             onPaste={(e) => handlePaste(e, 'back')}
-            onDragOver={handleDragOver}
+            onDragOver={(e) => handleDragOver(e, 'back')}
+            onDragLeave={handleDragLeave}
             onDrop={(e) => handleDrop(e, 'back')}
-            className="flex-1 w-full p-3 text-sm bg-gray-50 border border-gray-200 rounded-lg resize-none focus:ring-2 focus:ring-purple-400 focus:border-transparent outline-none dark:bg-gray-800 dark:border-gray-600 dark:text-white"
-            placeholder="使用 Markdown 格式撰寫答案..."
+            className={textAreaClass('back')}
+            placeholder="使用 Markdown 撰寫答案。可直接貼上或拖放圖片。"
           />
         </div>
+        {error && (
+          <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-600 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300">
+            {error}
+          </div>
+        )}
       </div>
 
       <div className="flex flex-col gap-4">
-        <div className="flex-1 flex flex-col">
-          <label className="text-xs font-semibold text-gray-400 uppercase mb-1">預覽（正面）</label>
-          <div className="flex-1 p-3 bg-white border border-gray-200 rounded-lg overflow-auto dark:bg-gray-800 dark:border-gray-600">
+        <div className="flex flex-1 flex-col">
+          <label className="mb-1 text-xs font-semibold uppercase text-gray-400">預覽（正面）</label>
+          <div className="flex-1 overflow-auto rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-600 dark:bg-gray-800">
             <div className="prose prose-sm max-w-none dark:prose-invert">
               <ReactMarkdown remarkPlugins={[remarkGfm]} components={{ img: MarkdownImage }}>{front || '_尚無內容_'}</ReactMarkdown>
             </div>
           </div>
         </div>
-        <div className="flex-1 flex flex-col">
-          <label className="text-xs font-semibold text-gray-400 uppercase mb-1">預覽（反面）</label>
-          <div className="flex-1 p-3 bg-white border border-gray-200 rounded-lg overflow-auto dark:bg-gray-800 dark:border-gray-600">
+        <div className="flex flex-1 flex-col">
+          <label className="mb-1 text-xs font-semibold uppercase text-gray-400">預覽（反面）</label>
+          <div className="flex-1 overflow-auto rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-600 dark:bg-gray-800">
             <div className="prose prose-sm max-w-none dark:prose-invert">
               <ReactMarkdown remarkPlugins={[remarkGfm]} components={{ img: MarkdownImage }}>{back || '_尚無內容_'}</ReactMarkdown>
             </div>

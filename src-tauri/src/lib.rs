@@ -51,6 +51,25 @@ fn get_images_dir(app: &tauri::AppHandle) -> PathBuf {
     path
 }
 
+fn sanitize_filename(filename: &str) -> String {
+    filename
+        .chars()
+        .filter(|c| c.is_alphanumeric() || *c == '.' || *c == '-' || *c == '_')
+        .collect::<String>()
+}
+
+fn is_supported_image(filename: &str) -> bool {
+    let ext = filename
+        .split('.')
+        .last()
+        .unwrap_or("")
+        .to_lowercase();
+    matches!(
+        ext.as_str(),
+        "png" | "jpg" | "jpeg" | "gif" | "webp" | "bmp" | "svg"
+    )
+}
+
 #[tauri::command]
 fn get_app_data_dir(app: tauri::AppHandle) -> Result<String, String> {
     let path = get_data_dir(&app);
@@ -82,22 +101,30 @@ fn save_data(app: tauri::AppHandle, data: AppData) -> Result<(), String> {
 #[tauri::command]
 fn save_image(app: tauri::AppHandle, data: Vec<u8>, filename: String) -> Result<String, String> {
     let dir = get_images_dir(&app);
-    let safe_name = filename
-        .chars()
-        .filter(|c| c.is_alphanumeric() || *c == '.' || *c == '-' || *c == '_')
-        .collect::<String>();
+    let safe_name = sanitize_filename(&filename);
+    if safe_name.is_empty() || !is_supported_image(&safe_name) {
+        return Err("Unsupported image filename".to_string());
+    }
     let path = dir.join(&safe_name);
     fs::write(&path, &data).map_err(|e| format!("Failed to save image: {}", e))?;
     Ok(format!("images/{}", safe_name))
 }
 
 #[tauri::command]
+fn import_image_file(app: tauri::AppHandle, path: String, filename: String) -> Result<String, String> {
+    let safe_name = sanitize_filename(&filename);
+    if safe_name.is_empty() || !is_supported_image(&safe_name) || !is_supported_image(&path) {
+        return Err("Unsupported image file".to_string());
+    }
+
+    let bytes = fs::read(&path).map_err(|e| format!("Failed to read image: {}", e))?;
+    save_image(app, bytes, safe_name)
+}
+
+#[tauri::command]
 fn get_image_base64(app: tauri::AppHandle, filename: String) -> Result<String, String> {
     let dir = get_images_dir(&app);
-    let safe_name = filename
-        .chars()
-        .filter(|c| c.is_alphanumeric() || *c == '.' || *c == '-' || *c == '_')
-        .collect::<String>();
+    let safe_name = sanitize_filename(&filename);
     let path = dir.join(&safe_name);
     let bytes = fs::read(&path).map_err(|e| format!("Failed to read image: {}", e))?;
     let ext = safe_name.split('.').last().unwrap_or("png").to_lowercase();
@@ -217,6 +244,7 @@ pub fn run() {
             load_data,
             save_data,
             save_image,
+            import_image_file,
             delete_unused_images,
             get_image_base64,
             get_app_data_dir,
