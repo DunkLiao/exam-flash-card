@@ -1,11 +1,8 @@
 import { useState } from 'react'
 import { useAppContext } from '../hooks/useAppData'
 import { openFileDialog, saveFileDialog, exportToFile, readImportFile, saveData } from '../utils/fileIO'
-import type { Card, Deck } from '../types'
-
-function generateId(): string {
-  return crypto.randomUUID()
-}
+import { buildCardsFromCsvRows, mergeImportedData, type CsvImportRow } from '../utils/importMerge'
+import type { AppData } from '../types'
 
 export function ImportExport() {
   const { data, refreshData, setView } = useAppContext()
@@ -41,15 +38,13 @@ export function ImportExport() {
         return
       }
 
-      const newDecks = imported.decks as Deck[]
-      const newCards = imported.cards as Card[]
-      const merged = {
-        decks: [...data.decks, ...newDecks],
-        cards: [...data.cards, ...newCards],
-      }
-      await saveData(merged)
+      const result = mergeImportedData(data, imported as AppData)
+      await saveData(result.data)
       await refreshData()
-      showMsg(`匯入成功：${newDecks.length} 個牌組、${newCards.length} 張卡片`, 'success')
+      showMsg(
+        `匯入成功：新增 ${result.addedDecks} 個牌組、${result.addedCards} 張卡片，略過 ${result.skippedCards} 張重複卡片`,
+        'success',
+      )
     } catch (e) {
       showMsg(`匯入失敗：${String(e)}`, 'error')
     }
@@ -100,52 +95,25 @@ export function ImportExport() {
         return
       }
 
-      const deckMap = new Map(data.decks.map((d) => [d.name, d.id]))
-      const newCards: Card[] = []
-      const newDecks: Deck[] = []
-      let imported = 0
+      const rows: CsvImportRow[] = []
 
       for (let i = 1; i < lines.length; i++) {
         const cols = parseCSVLine(lines[i])
-        const deckName = deckNameIdx >= 0 ? (cols[deckNameIdx] || 'Default') : 'Default'
-        const front = cols[frontIdx] || ''
-        const back = cols[backIdx] || ''
-        if (!front && !back) continue
-
-        let deckId = deckMap.get(deckName)
-        if (!deckId) {
-          deckId = generateId()
-          deckMap.set(deckName, deckId)
-          newDecks.push({
-            id: deckId,
-            name: deckName,
-            description: '',
-            createdAt: new Date().toISOString(),
-          })
-        }
-
-        const now = new Date().toISOString().split('T')[0]
-        newCards.push({
-          id: generateId(),
-          front,
-          back,
-          deckId,
-          ease: 2.5,
-          interval: 0,
-          repetitions: 0,
-          nextReview: now,
-          lastReview: now,
+        rows.push({
+          deckName: deckNameIdx >= 0 ? (cols[deckNameIdx] || 'Default') : 'Default',
+          front: cols[frontIdx] || '',
+          back: cols[backIdx] || '',
         })
-        imported++
       }
 
-      const merged = {
-        decks: [...data.decks, ...newDecks],
-        cards: [...data.cards, ...newCards],
-      }
-      await saveData(merged)
+      const now = new Date().toISOString().split('T')[0]
+      const result = buildCardsFromCsvRows(data, rows, now)
+      await saveData(result.data)
       await refreshData()
-      showMsg(`匯入 CSV 成功：${newDecks.length} 個牌組、${imported} 張卡片`, 'success')
+      showMsg(
+        `匯入 CSV 成功：新增 ${result.addedDecks} 個牌組、${result.addedCards} 張卡片，略過 ${result.skippedCards} 張重複卡片`,
+        'success',
+      )
     } catch (e) {
       showMsg(`匯入 CSV 失敗：${String(e)}`, 'error')
     }
