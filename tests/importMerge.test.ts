@@ -25,6 +25,7 @@ function card(id: string, deckId: string, front: string, back: string): Card {
     repetitions: 0,
     nextReview: '2026-07-01',
     lastReview: '2026-07-01',
+    starRating: 0,
   }
 }
 

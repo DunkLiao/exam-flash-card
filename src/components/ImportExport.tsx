@@ -55,13 +55,13 @@ export function ImportExport() {
       const path = await saveFileDialog('flashcards.csv')
       if (!path) return
 
-      const headers = 'deckName,front,back'
+      const headers = 'deckName,front,back,starRating'
       const rows = data.cards.map((c) => {
         const deck = data.decks.find((d) => d.id === c.deckId)
         const deckName = deck?.name ?? ''
         const escFront = `"${c.front.replace(/"/g, '""')}"`
         const escBack = `"${c.back.replace(/"/g, '""')}"`
-        return `"${deckName}",${escFront},${escBack}`
+        return `"${deckName}",${escFront},${escBack},${c.starRating ?? 0}`
       })
       const csv = [headers, ...rows].join('\n') + '\n'
 
@@ -89,6 +89,7 @@ export function ImportExport() {
       const deckNameIdx = headers.findIndex((h) => h.toLowerCase() === 'deckname')
       const frontIdx = headers.findIndex((h) => h.toLowerCase() === 'front')
       const backIdx = headers.findIndex((h) => h.toLowerCase() === 'back')
+      const starRatingIdx = headers.findIndex((h) => h.toLowerCase() === 'starrating')
 
       if (frontIdx === -1 || backIdx === -1) {
         showMsg('CSV 必須包含 front 和 back 欄位', 'error')
@@ -103,6 +104,7 @@ export function ImportExport() {
           deckName: deckNameIdx >= 0 ? (cols[deckNameIdx] || 'Default') : 'Default',
           front: cols[frontIdx] || '',
           back: cols[backIdx] || '',
+          starRating: starRatingIdx >= 0 ? cols[starRatingIdx] : undefined,
         })
       }
 

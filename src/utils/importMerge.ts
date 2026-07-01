@@ -1,4 +1,5 @@
 import type { AppData, Card, Deck } from '../types'
+import { normalizeStarRating, withNormalizedCardMetadata } from './reviewProgress.ts'
 
 export interface ImportMergeResult {
   data: AppData
@@ -11,6 +12,7 @@ export interface CsvImportRow {
   deckName: string
   front: string
   back: string
+  starRating?: string
 }
 
 function generateId(): string {
@@ -76,7 +78,7 @@ export function mergeImportedData(current: AppData, imported: AppData): ImportMe
       continue
     }
 
-    const mergedCard = { ...card, deckId: mergedDeckId }
+    const mergedCard = withNormalizedCardMetadata({ ...card, deckId: mergedDeckId })
     cards.push(mergedCard)
     existingCardIds.add(mergedCard.id)
     existingCardKeys.add(key)
@@ -139,6 +141,7 @@ export function buildCardsFromCsvRows(
       repetitions: 0,
       nextReview: now,
       lastReview: now,
+      starRating: normalizeStarRating(row.starRating),
     })
     existingCardKeys.add(key)
     addedCards++

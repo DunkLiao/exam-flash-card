@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
-    "test": "node tests/imageRefs.test.ts && node tests/importMerge.test.ts",
+    "test": "node tests/imageRefs.test.ts && node tests/importMerge.test.ts && node tests/reviewProgress.test.ts",
     "preview": "vite preview",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",

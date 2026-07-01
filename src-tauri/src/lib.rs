@@ -18,6 +18,8 @@ pub struct Card {
     pub next_review: String,
     #[serde(rename = "lastReview")]
     pub last_review: String,
+    #[serde(rename = "starRating", default)]
+    pub star_rating: u32,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

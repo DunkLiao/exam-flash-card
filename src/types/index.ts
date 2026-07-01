@@ -8,6 +8,7 @@ export interface Card {
   repetitions: number
   nextReview: string
   lastReview: string
+  starRating: number
 }
 
 export interface Deck {

@@ -34,6 +34,7 @@ export function ReviewMode() {
   }, [flipped, finished, reviewCards.length, handleRate])
 
   const current = reviewCards[index]
+  const progressPercent = reviewCards.length === 0 ? 0 : Math.round(((index + 1) / reviewCards.length) * 100)
 
   function handleRate(rating: Rating) {
     if (!current) return
@@ -101,6 +102,19 @@ export function ReviewMode() {
             間隔 {current.interval} 天 · 下次 {current.nextReview}
           </span>
         )}
+      </div>
+
+      <div className="w-full max-w-lg mb-4">
+        <div className="flex items-center justify-between text-xs text-gray-500 mb-1 dark:text-gray-400">
+          <span>本次進度 {index + 1} / {reviewCards.length}</span>
+          <span>{progressPercent}%</span>
+        </div>
+        <div className="h-2 rounded-full bg-gray-200 overflow-hidden dark:bg-gray-700">
+          <div
+            className="h-full rounded-full bg-blue-500 transition-all"
+            style={{ width: `${progressPercent}%` }}
+          />
+        </div>
       </div>
 
       <div className="w-full max-w-lg mb-6">

@@ -4,6 +4,7 @@ import { DeckView } from './components/DeckView'
 import { ReviewMode } from './components/ReviewMode'
 import { QuizMode } from './components/QuizMode'
 import { ImportExport } from './components/ImportExport'
+import { getDeckProgress } from './utils/reviewProgress'
 
 export default function App() {
   const { view, selectedDeckId, loading } = useAppContext()
@@ -32,8 +33,8 @@ export default function App() {
 }
 
 function DeckList() {
-  const { decks, selectDeck, setView, cards } = useAppContext()
-  const { deleteDeck } = useAppContext()
+  const { decks, selectDeck, setView, cards, deleteDeck } = useAppContext()
+  const today = new Date().toISOString().split('T')[0]
 
   return (
     <div className="flex-1 flex flex-col p-6 page-enter">
@@ -50,13 +51,13 @@ function DeckList() {
       {decks.length === 0 ? (
         <div className="flex-1 flex flex-col items-center justify-center text-gray-400 dark:text-gray-500">
           <div className="text-6xl mb-4">&#x1F4DA;</div>
-          <p className="text-lg">尚無牌組</p>
-          <p className="text-sm mt-1">使用左側面板新增牌組，或匯入現有資料</p>
+          <p className="text-lg">還沒有牌組</p>
+          <p className="text-sm mt-1">請從左側新增牌組，或使用匯入工具載入資料。</p>
         </div>
       ) : (
         <div className="grid gap-4 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
-          {decks.map((deck: { id: string; name: string; description: string; createdAt: string }) => {
-            const count = cards.filter((c: { deckId: string }) => c.deckId === deck.id).length
+          {decks.map((deck) => {
+            const progress = getDeckProgress(cards, deck.id, today)
             return (
               <div
                 key={deck.id}
@@ -66,20 +67,38 @@ function DeckList() {
                 <div className="flex items-start justify-between mb-2">
                   <h3 className="font-semibold text-gray-800 dark:text-white">{deck.name}</h3>
                   <button
-                    onClick={(e) => { e.stopPropagation(); deleteDeck(deck.id) }}
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      deleteDeck(deck.id)
+                    }}
                     className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 transition-opacity text-sm"
                   >
-                    ✕
+                    刪除
                   </button>
                 </div>
+
                 {deck.description && (
                   <p className="text-sm text-gray-500 mb-3 dark:text-gray-400">{deck.description}</p>
                 )}
-                <div className="flex items-center gap-4 text-xs text-gray-400 dark:text-gray-500">
-                  <span>{count} 張卡片</span>
-                  <span>
-                    建立於 {new Date(deck.createdAt).toLocaleDateString('zh-TW')}
-                  </span>
+
+                <div className="mb-3">
+                  <div className="flex items-center justify-between text-xs text-gray-500 mb-1 dark:text-gray-400">
+                    <span>已學 {progress.learnedCards} / {progress.totalCards}</span>
+                    <span>{progress.learnedPercent}%</span>
+                  </div>
+                  <div className="h-2 rounded-full bg-gray-100 overflow-hidden dark:bg-gray-700">
+                    <div
+                      className="h-full rounded-full bg-green-500"
+                      style={{ width: `${progress.learnedPercent}%` }}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-400 dark:text-gray-500">
+                  <span>{progress.totalCards} 張卡片</span>
+                  <span>待複習 {progress.dueCards}</span>
+                  <span>新卡 {progress.newCards}</span>
+                  <span>建立於 {new Date(deck.createdAt).toLocaleDateString('zh-TW')}</span>
                 </div>
               </div>
             )

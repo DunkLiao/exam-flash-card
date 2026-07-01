@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useCallback, useEffect } from 'rea
 import type { AppData, Deck, Card, View } from '../types'
 import { loadData, saveData, deleteUnusedImages } from '../utils/fileIO'
 import { collectImageFilenames, shouldCleanupImagesAfterChange, type ImageCleanupChange } from '../utils/imageRefs'
+import { normalizeStarRating, withNormalizedCardMetadata } from '../utils/reviewProgress'
 
 function generateId(): string {
   return crypto.randomUUID()
@@ -22,6 +23,7 @@ interface AppContextType {
   updateCard: (id: string, front: string, back: string) => void
   deleteCard: (id: string) => void
   updateCardSRS: (id: string, updates: Partial<Card>) => void
+  updateCardStarRating: (id: string, starRating: number) => void
   loading: boolean
   refreshData: () => Promise<void>
 }
@@ -44,7 +46,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     try {
       const d = await loadData()
       if (d) {
-        setData(d)
+        setData({
+          ...d,
+          cards: d.cards.map(withNormalizedCardMetadata),
+        })
       }
     } catch {
       setData({ decks: [], cards: [] })
@@ -114,6 +119,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       repetitions: 0,
       nextReview: now,
       lastReview: now,
+      starRating: 0,
     }
     const newData = { ...data, cards: [...data.cards, card] }
     persist(newData)
@@ -145,6 +151,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     persist(newData)
   }, [data, persist])
 
+  const updateCardStarRating = useCallback((id: string, starRating: number) => {
+    const newData = {
+      ...data,
+      cards: data.cards.map((c) => (
+        c.id === id ? { ...c, starRating: normalizeStarRating(starRating) } : c
+      )),
+    }
+    persist(newData)
+  }, [data, persist])
+
   const selectDeck = useCallback((id: string | null) => {
     setSelectedDeckId(id)
     if (id) setView('cards')
@@ -168,6 +184,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         updateCard,
         deleteCard,
         updateCardSRS,
+        updateCardStarRating,
         loading,
         refreshData,
       }}
