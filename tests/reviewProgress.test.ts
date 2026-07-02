@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import type { AppData, Card, Deck } from '../src/types/index.ts'
 import { buildCardsFromCsvRows, mergeImportedData } from '../src/utils/importMerge.ts'
-import { getDeckProgress, normalizeStarRating } from '../src/utils/reviewProgress.ts'
+import { getDeckProgress, getReviewSessionCards, normalizeStarRating } from '../src/utils/reviewProgress.ts'
 
 function deck(id: string, name: string): Deck {
   return {
@@ -86,6 +86,21 @@ assert.equal(normalizeStarRating('bad'), 0)
     newCards: 1,
     learnedPercent: 67,
   })
+}
+
+{
+  const cards = [
+    card({ id: 'new-due', repetitions: 0, nextReview: '2026-07-01' }),
+    card({ id: 'learned-due', repetitions: 2, nextReview: '2026-06-30' }),
+    card({ id: 'learned-later', repetitions: 1, nextReview: '2026-07-10' }),
+    card({ id: 'other-deck', deckId: 'other', repetitions: 0, nextReview: '2026-07-01' }),
+  ]
+
+  assert.deepEqual(
+    getReviewSessionCards(cards, 'deck', '2026-07-01').map((item) => item.id),
+    ['learned-due', 'new-due'],
+    'review session should include due learned cards and new cards once',
+  )
 }
 
 console.log('reviewProgress tests passed')

@@ -1,33 +1,42 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useAppContext } from '../hooks/useAppData'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { MarkdownImage } from './MarkdownImage'
+import type { Card } from '../types'
+
+function buildQuizCards(cards: Card[], deckId: string | null): Card[] {
+  const deckCards = cards.filter((card) => card.deckId === deckId)
+  return [...deckCards].sort(() => Math.random() - 0.5).slice(0, Math.min(20, deckCards.length))
+}
 
 export function QuizMode() {
   const { cards, selectedDeckId, setView } = useAppContext()
+  const [quizCards, setQuizCards] = useState<Card[]>(() => buildQuizCards(cards, selectedDeckId))
   const [currentIndex, setCurrentIndex] = useState(0)
   const [userAnswer, setUserAnswer] = useState('')
   const [showAnswer, setShowAnswer] = useState(false)
-  const [answers, setAnswers] = useState<(boolean | null)[]>([])
+  const [answers, setAnswers] = useState<(boolean | null)[]>(() => new Array(quizCards.length).fill(null))
   const [finished, setFinished] = useState(false)
 
-  const quizCards = useMemo(() => {
-    const deckCards = cards.filter((c) => c.deckId === selectedDeckId)
-    return [...deckCards].sort(() => Math.random() - 0.5).slice(0, Math.min(20, deckCards.length))
-  }, [cards, selectedDeckId])
-
-  useEffect(() => {
-    setAnswers(new Array(quizCards.length).fill(null))
+  const resetQuiz = useCallback((nextCards: Card[]) => {
+    setQuizCards(nextCards)
+    setAnswers(new Array(nextCards.length).fill(null))
     setCurrentIndex(0)
     setShowAnswer(false)
     setFinished(false)
     setUserAnswer('')
-  }, [quizCards])
+  }, [])
+
+  useEffect(() => {
+    resetQuiz(buildQuizCards(cards, selectedDeckId))
+  }, [cards, resetQuiz, selectedDeckId])
+
+  const current = quizCards[currentIndex]
 
   function handleSubmit() {
-    if (finished) return
-    const correct = userAnswer.trim().toLowerCase() === quizCards[currentIndex].back.trim().toLowerCase()
+    if (finished || !current) return
+    const correct = userAnswer.trim().toLowerCase() === current.back.trim().toLowerCase()
     const newAnswers = [...answers]
     newAnswers[currentIndex] = correct
     setAnswers(newAnswers)
@@ -45,19 +54,19 @@ export function QuizMode() {
   }
 
   const stats = {
-    total: answers.filter((a) => a !== null).length,
-    correct: answers.filter((a) => a === true).length,
-    wrong: answers.filter((a) => a === false).length,
+    total: answers.filter((answer) => answer !== null).length,
+    correct: answers.filter((answer) => answer === true).length,
+    wrong: answers.filter((answer) => answer === false).length,
   }
 
   if (quizCards.length === 0) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center p-8">
-        <div className="text-6xl mb-4">&#x1F4ED;</div>
-        <p className="text-gray-500 mb-4 dark:text-gray-400">牌組中尚無卡片</p>
+        <div className="text-6xl mb-4">📭</div>
+        <p className="text-gray-500 mb-4 dark:text-gray-400">這個牌組沒有可測驗的卡片</p>
         <button
           onClick={() => setView('cards')}
-          className="px-6 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg text-white font-medium"
+          className="px-6 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg text-white font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 focus-visible:ring-offset-2"
         >
           回到牌組
         </button>
@@ -69,7 +78,7 @@ export function QuizMode() {
     const accuracy = stats.total > 0 ? Math.round((stats.correct / stats.total) * 100) : 0
     return (
       <div className="flex-1 flex flex-col items-center justify-center p-8 page-enter">
-        <div className="text-6xl mb-4">{accuracy >= 80 ? '&#x1F389;' : '&#x1F4AA;'}</div>
+        <div className="text-6xl mb-4">{accuracy >= 80 ? '🎉' : '💪'}</div>
         <h2 className="text-2xl font-bold text-gray-800 mb-2 dark:text-white">測驗完成！</h2>
         <div className="flex gap-8 my-6">
           <div className="text-center">
@@ -87,22 +96,14 @@ export function QuizMode() {
         </div>
         <div className="flex gap-3">
           <button
-            onClick={() => {
-              const deckCards = cards.filter((c) => c.deckId === selectedDeckId)
-              const shuffled = [...deckCards].sort(() => Math.random() - 0.5).slice(0, Math.min(20, deckCards.length))
-              setAnswers(new Array(shuffled.length).fill(null))
-              setCurrentIndex(0)
-              setShowAnswer(false)
-              setFinished(false)
-              setUserAnswer('')
-            }}
-            className="px-6 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg text-white font-medium"
+            onClick={() => resetQuiz(buildQuizCards(cards, selectedDeckId))}
+            className="px-6 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg text-white font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 focus-visible:ring-offset-2"
           >
             再測一次
           </button>
           <button
             onClick={() => setView('cards')}
-            className="px-6 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg text-gray-700 font-medium dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-300"
+            className="px-6 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg text-gray-700 font-medium dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-400 focus-visible:ring-offset-2"
           >
             回到牌組
           </button>
@@ -111,20 +112,18 @@ export function QuizMode() {
     )
   }
 
-  const current = quizCards[currentIndex]
-
   return (
     <div className="flex-1 flex flex-col items-center p-8 page-enter">
       <div className="w-full max-w-lg mb-2 text-sm text-gray-400 text-center">
         第 {currentIndex + 1} / {quizCards.length} 題
         {stats.total > 0 && (
           <span className="ml-3 text-green-500">
-            &#x2713; {stats.correct}
+            ✓ {stats.correct}
           </span>
         )}
         {stats.wrong > 0 && (
           <span className="ml-1 text-red-500">
-            &#x2717; {stats.wrong}
+            ✗ {stats.wrong}
           </span>
         )}
       </div>
@@ -137,9 +136,9 @@ export function QuizMode() {
         <div className="space-y-3">
           <input
             value={userAnswer}
-            onChange={(e) => setUserAnswer(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
+            onChange={(event) => setUserAnswer(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
                 if (showAnswer) handleNext()
                 else handleSubmit()
               }
@@ -154,9 +153,9 @@ export function QuizMode() {
             <button
               onClick={handleSubmit}
               disabled={!userAnswer.trim()}
-              className="w-full px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-purple-300 rounded-lg text-white font-medium disabled:cursor-not-allowed"
+              className="w-full px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-purple-300 rounded-lg text-white font-medium disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 focus-visible:ring-offset-2"
             >
-              確認答案
+              提交答案
             </button>
           ) : (
             <div>
@@ -166,7 +165,7 @@ export function QuizMode() {
                   : 'bg-red-50 text-red-700 border border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800'
               }`}>
                 <div className="font-medium mb-1">
-                  {answers[currentIndex] ? '&#x2705; 正確！' : '&#x274C; 錯誤！'}
+                  {answers[currentIndex] ? '✅ 正確！' : '❌ 錯誤！'}
                 </div>
                 <div>
                   正確答案：{' '}
@@ -175,7 +174,7 @@ export function QuizMode() {
               </div>
               <button
                 onClick={handleNext}
-                className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-white font-medium"
+                className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-white font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2"
               >
                 {currentIndex + 1 >= quizCards.length ? '查看結果' : '下一題'}
               </button>
@@ -186,7 +185,7 @@ export function QuizMode() {
 
       <button
         onClick={() => setView('cards')}
-        className="text-sm text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+        className="text-sm text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-400 focus-visible:ring-offset-2"
       >
         ← 回到牌組
       </button>

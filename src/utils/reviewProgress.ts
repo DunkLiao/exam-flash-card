@@ -22,6 +22,21 @@ export function withNormalizedCardMetadata(card: Card): Card {
   }
 }
 
+export function getReviewSessionCards(cards: Card[], deckId: string, today: string): Card[] {
+  const deckCards = cards.filter((card) => card.deckId === deckId)
+  const dueCards = deckCards
+    .filter((card) => isDue(card, today) && card.repetitions > 0)
+    .sort((a, b) => a.nextReview.localeCompare(b.nextReview))
+  const newCards = deckCards.filter((card) => card.repetitions === 0)
+  const seen = new Set<string>()
+
+  return [...dueCards, ...newCards].filter((card) => {
+    if (seen.has(card.id)) return false
+    seen.add(card.id)
+    return true
+  })
+}
+
 export function getDeckProgress(cards: Card[], deckId: string, today: string): DeckProgress {
   const deckCards = cards.filter((card) => card.deckId === deckId)
   const totalCards = deckCards.length
