@@ -179,10 +179,10 @@ export function MarkdownEditor({ front, back, onFrontChange, onBackChange }: Mar
         type="button"
         onClick={() => handleToolbarInsert(target)}
         disabled={uploadingTarget !== null}
-        className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+        className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
           uploading
-            ? 'cursor-wait bg-gray-100 text-gray-400 dark:bg-gray-700 dark:text-gray-500'
-            : 'bg-gray-100 text-gray-600 hover:bg-purple-100 hover:text-purple-700 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-purple-900/40 dark:hover:text-purple-200'
+            ? 'cursor-wait bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500'
+            : 'bg-slate-100 text-slate-600 hover:bg-blue-100 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-blue-950/50 dark:hover:text-blue-200'
         }`}
         title="插入圖片"
       >
@@ -193,21 +193,21 @@ export function MarkdownEditor({ front, back, onFrontChange, onBackChange }: Mar
 
   const textAreaClass = (target: CardSide) => {
     const active = dragTarget === target
-    return `flex-1 w-full rounded-lg border p-3 text-sm outline-none resize-none transition-colors focus:ring-2 focus:ring-purple-400 ${
+    return `min-h-40 flex-1 w-full resize-none rounded-lg border p-3 text-sm outline-none transition-colors focus:ring-2 focus:ring-blue-400 ${
       active
-        ? 'border-purple-400 bg-purple-50 dark:border-purple-500 dark:bg-purple-950/30'
-        : 'border-gray-200 bg-gray-50 dark:border-gray-600 dark:bg-gray-800'
+        ? 'border-blue-400 bg-blue-50 dark:border-blue-500 dark:bg-blue-950/30'
+        : 'border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-900'
     } dark:text-white`
   }
 
   return (
-    <div className="grid h-full grid-cols-2 gap-4">
-      <div className="flex flex-col gap-4">
+    <div className="grid h-full gap-4 overflow-y-auto lg:grid-cols-2 lg:overflow-hidden">
+      <div className="flex min-h-[620px] flex-col gap-4 lg:min-h-0">
         <div className="flex flex-1 flex-col">
           <div className="mb-1 flex items-center justify-between gap-3">
             <div>
-              <label className="text-xs font-semibold uppercase text-gray-400">正面（題目）</label>
-              <p className="text-[11px] text-gray-400">可點選、貼上或拖放圖片</p>
+              <label className="text-xs font-semibold uppercase text-slate-400">正面（題目）</label>
+              <p className="text-[11px] text-slate-400">可點選、貼上或拖放圖片</p>
             </div>
             {imageButton('front')}
           </div>
@@ -226,8 +226,8 @@ export function MarkdownEditor({ front, back, onFrontChange, onBackChange }: Mar
         <div className="flex flex-1 flex-col">
           <div className="mb-1 flex items-center justify-between gap-3">
             <div>
-              <label className="text-xs font-semibold uppercase text-gray-400">反面（答案）</label>
-              <p className="text-[11px] text-gray-400">可點選、貼上或拖放圖片</p>
+              <label className="text-xs font-semibold uppercase text-slate-400">反面（答案）</label>
+              <p className="text-[11px] text-slate-400">可點選、貼上或拖放圖片</p>
             </div>
             {imageButton('back')}
           </div>
@@ -250,18 +250,18 @@ export function MarkdownEditor({ front, back, onFrontChange, onBackChange }: Mar
         )}
       </div>
 
-      <div className="flex flex-col gap-4">
+      <div className="flex min-h-[620px] flex-col gap-4 lg:min-h-0">
         <div className="flex flex-1 flex-col">
-          <label className="mb-1 text-xs font-semibold uppercase text-gray-400">預覽（正面）</label>
-          <div className="flex-1 overflow-auto rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-600 dark:bg-gray-800">
+          <label className="mb-1 text-xs font-semibold uppercase text-slate-400">預覽（正面）</label>
+          <div className="flex-1 overflow-auto rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
             <div className="prose prose-sm max-w-none dark:prose-invert">
               <ReactMarkdown remarkPlugins={[remarkGfm]} components={{ img: MarkdownImage }}>{front || '_尚無內容_'}</ReactMarkdown>
             </div>
           </div>
         </div>
         <div className="flex flex-1 flex-col">
-          <label className="mb-1 text-xs font-semibold uppercase text-gray-400">預覽（反面）</label>
-          <div className="flex-1 overflow-auto rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-600 dark:bg-gray-800">
+          <label className="mb-1 text-xs font-semibold uppercase text-slate-400">預覽（反面）</label>
+          <div className="flex-1 overflow-auto rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
             <div className="prose prose-sm max-w-none dark:prose-invert">
               <ReactMarkdown remarkPlugins={[remarkGfm]} components={{ img: MarkdownImage }}>{back || '_尚無內容_'}</ReactMarkdown>
             </div>

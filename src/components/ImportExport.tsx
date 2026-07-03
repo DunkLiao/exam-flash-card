@@ -1,7 +1,9 @@
 import { useState } from 'react'
+import { DatabaseBackup, FileDown, FileSpreadsheet, FileUp } from 'lucide-react'
 import { useAppContext } from '../hooks/useAppData'
 import { openFileDialog, saveFileDialog, exportToFile, readImportFile, saveData } from '../utils/fileIO'
 import { buildCardsFromCsvRows, mergeImportedData, type CsvImportRow } from '../utils/importMerge'
+import { Button, PageHeader, PageShell, Surface } from './ui'
 import type { AppData } from '../types'
 
 export function ImportExport() {
@@ -65,7 +67,7 @@ export function ImportExport() {
       })
       const csv = [headers, ...rows].join('\n') + '\n'
 
-      await exportToFile(path, '\uFEFF' + csv) // BOM for Excel
+      await exportToFile(path, '\uFEFF' + csv)
       showMsg('匯出 CSV 成功！', 'success')
     } catch {
       showMsg('匯出 CSV 失敗', 'error')
@@ -77,7 +79,6 @@ export function ImportExport() {
       const path = await openFileDialog()
       if (!path) return
       const content = await readImportFile(path)
-      // Remove BOM if present
       const text = content.charCodeAt(0) === 0xFEFF ? content.slice(1) : content
       const lines = text.split('\n').filter((l) => l.trim())
       if (lines.length < 2) {
@@ -122,69 +123,95 @@ export function ImportExport() {
   }
 
   return (
-    <div className="flex-1 flex flex-col items-center p-8 page-enter">
-      <h2 className="text-2xl font-bold text-gray-800 mb-8 dark:text-white">匯入 / 匯出</h2>
+    <PageShell>
+      <PageHeader
+        title="匯入 / 匯出"
+        subtitle="備份完整資料，或用 CSV 與 Excel 交換卡片內容。"
+        actions={<Button onClick={() => setView('decks')} variant="secondary">回到牌組列表</Button>}
+      />
 
-      <div className="w-full max-w-md space-y-6">
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 dark:bg-gray-800 dark:border-gray-700">
-          <h3 className="font-semibold text-gray-700 mb-4 dark:text-gray-200">匯出</h3>
-          <div className="space-y-3">
-            <button
-              onClick={handleExportJSON}
-              className="w-full px-4 py-3 bg-purple-600 hover:bg-purple-700 rounded-lg text-white font-medium text-sm"
-            >
-              匯出為 JSON（完整備份，含 SRS 進度）
-            </button>
-            <button
-              onClick={handleExportCSV}
-              className="w-full px-4 py-3 bg-gray-600 hover:bg-gray-700 rounded-lg text-white font-medium text-sm"
-            >
-              匯出為 CSV（Excel 相容，僅正面/反面/牌組）
-            </button>
-          </div>
-        </div>
+      <div className="mx-auto grid w-full max-w-4xl gap-4 lg:grid-cols-2">
+        <TransferPanel
+          icon={<FileDown className="h-5 w-5" />}
+          title="匯出"
+          description="建立備份或提供 Excel 可讀的卡片資料。"
+          actions={(
+            <>
+              <Button onClick={handleExportJSON} variant="primary" className="w-full justify-start" size="lg">
+                <DatabaseBackup className="h-4 w-4" />
+                匯出為 JSON（完整備份，含 SRS 進度）
+              </Button>
+              <Button onClick={handleExportCSV} variant="secondary" className="w-full justify-start" size="lg">
+                <FileSpreadsheet className="h-4 w-4" />
+                匯出為 CSV（Excel 相容）
+              </Button>
+            </>
+          )}
+        />
 
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 dark:bg-gray-800 dark:border-gray-700">
-          <h3 className="font-semibold text-gray-700 mb-4 dark:text-gray-200">匯入</h3>
-          <div className="space-y-3">
-            <button
-              onClick={handleImportJSON}
-              className="w-full px-4 py-3 bg-green-600 hover:bg-green-700 rounded-lg text-white font-medium text-sm"
-            >
-              從 JSON 匯入（完整備份還原）
-            </button>
-            <button
-              onClick={handleImportCSV}
-              className="w-full px-4 py-3 bg-blue-600 hover:bg-blue-700 rounded-lg text-white font-medium text-sm"
-            >
-              從 CSV 匯入（Excel 匯出格式）
-            </button>
-          </div>
-          <p className="text-xs text-gray-400 mt-3 dark:text-gray-500">
-            CSV 欄位：deckName, front, back（deckName 可省略，預設為 Default）
-          </p>
-        </div>
-
-        {message && (
-          <div
-            className={`p-3 rounded-lg text-sm text-center ${
-              msgType === 'success'
-                ? 'bg-green-50 text-green-700 border border-green-200 dark:bg-green-900/20 dark:text-green-400'
-                : 'bg-red-50 text-red-700 border border-red-200 dark:bg-red-900/20 dark:text-red-400'
-            }`}
-          >
-            {message}
-          </div>
-        )}
+        <TransferPanel
+          icon={<FileUp className="h-5 w-5" />}
+          title="匯入"
+          description="匯入時會略過重複卡片，保留既有資料。"
+          actions={(
+            <>
+              <Button onClick={handleImportJSON} variant="success" className="w-full justify-start" size="lg">
+                <DatabaseBackup className="h-4 w-4" />
+                從 JSON 匯入（完整備份還原）
+              </Button>
+              <Button onClick={handleImportCSV} variant="primary" className="w-full justify-start" size="lg">
+                <FileSpreadsheet className="h-4 w-4" />
+                從 CSV 匯入（Excel 匯出格式）
+              </Button>
+            </>
+          )}
+        />
       </div>
 
-      <button
-        onClick={() => setView('decks')}
-        className="mt-8 text-sm text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-      >
-        ← 回到牌組列表
-      </button>
-    </div>
+      <Surface className="mx-auto mt-4 max-w-4xl p-4 text-sm text-slate-500 dark:text-slate-400">
+        CSV 欄位：<span className="font-medium text-slate-700 dark:text-slate-200">deckName, front, back, starRating</span>。
+        deckName 可省略，預設為 Default。
+      </Surface>
+
+      {message && (
+        <div
+          className={`mx-auto mt-4 max-w-4xl rounded-xl border p-4 text-sm ${
+            msgType === 'success'
+              ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-300'
+              : 'border-red-200 bg-red-50 text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300'
+          }`}
+        >
+          {message}
+        </div>
+      )}
+    </PageShell>
+  )
+}
+
+function TransferPanel({
+  icon,
+  title,
+  description,
+  actions,
+}: {
+  icon: React.ReactNode
+  title: string
+  description: string
+  actions: React.ReactNode
+}) {
+  return (
+    <Surface className="p-5">
+      <div className="mb-5 flex items-start gap-3">
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-300">
+          {icon}
+        </div>
+        <div>
+          <h3 className="font-semibold text-slate-900 dark:text-white">{title}</h3>
+          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{description}</p>
+        </div>
+      </div>
+      <div className="space-y-3">{actions}</div>
+    </Surface>
   )
 }
 

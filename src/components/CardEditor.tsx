@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react'
+import { X } from 'lucide-react'
 import { MarkdownEditor } from './MarkdownEditor'
+import { Button } from './ui'
 
 interface CardEditorProps {
   initialFront?: string
@@ -19,19 +21,22 @@ export function CardEditor({ initialFront = '', initialBack = '', onSave, onCanc
   }, [initialFront, initialBack])
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl h-[85vh] flex flex-col dark:bg-gray-900">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-          <h3 className="text-lg font-semibold text-gray-800 dark:text-white">{title}</h3>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm">
+      <div className="flex h-[88vh] w-full max-w-5xl flex-col rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-950">
+        <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4 dark:border-slate-800">
+          <div>
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-white">{title}</h3>
+            <p className="text-sm text-slate-500 dark:text-slate-400">支援 Markdown、貼上圖片與拖放圖片。</p>
+          </div>
           <button
             onClick={onCancel}
-            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-xl leading-none"
+            className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200"
           >
-            ✕
+            <X className="h-5 w-5" />
           </button>
         </div>
 
-        <div className="flex-1 p-6 overflow-hidden">
+        <div className="flex-1 overflow-hidden p-4 sm:p-6">
           <MarkdownEditor
             front={front}
             back={back}
@@ -40,20 +45,17 @@ export function CardEditor({ initialFront = '', initialBack = '', onSave, onCanc
           />
         </div>
 
-        <div className="flex justify-end gap-2 px-6 py-4 border-t border-gray-200 dark:border-gray-700">
-          <button
-            onClick={onCancel}
-            className="px-4 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-300"
-          >
+        <div className="flex justify-end gap-2 border-t border-slate-200 px-6 py-4 dark:border-slate-800">
+          <Button onClick={onCancel} variant="secondary">
             取消
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={() => onSave(front, back)}
             disabled={!front.trim() || !back.trim()}
-            className="px-6 py-2 text-sm bg-purple-600 hover:bg-purple-700 disabled:bg-purple-300 rounded-lg text-white font-medium disabled:cursor-not-allowed"
+            variant="primary"
           >
             儲存
-          </button>
+          </Button>
         </div>
       </div>
     </div>

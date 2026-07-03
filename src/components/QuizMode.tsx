@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
+import { CheckCircle2, ClipboardCheck, RotateCcw, XCircle } from 'lucide-react'
 import { useAppContext } from '../hooks/useAppData'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { MarkdownImage } from './MarkdownImage'
+import { Button, EmptyState, PageHeader, PageShell, ProgressBar, StatPill, Surface } from './ui'
 import type { Card } from '../types'
 
 function buildQuizCards(cards: Card[], deckId: string | null): Card[] {
@@ -58,137 +60,129 @@ export function QuizMode() {
     correct: answers.filter((answer) => answer === true).length,
     wrong: answers.filter((answer) => answer === false).length,
   }
+  const progressPercent = quizCards.length === 0 ? 0 : Math.round(((currentIndex + 1) / quizCards.length) * 100)
 
   if (quizCards.length === 0) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center p-8">
-        <div className="text-6xl mb-4">📭</div>
-        <p className="text-gray-500 mb-4 dark:text-gray-400">這個牌組沒有可測驗的卡片</p>
-        <button
-          onClick={() => setView('cards')}
-          className="px-6 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg text-white font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 focus-visible:ring-offset-2"
-        >
-          回到牌組
-        </button>
-      </div>
+      <PageShell className="flex flex-col">
+        <EmptyState
+          icon={<ClipboardCheck className="h-7 w-7" />}
+          title="這個牌組沒有可測驗的卡片"
+          description="新增卡片後即可使用測驗模式練習回想。"
+          action={<Button onClick={() => setView('cards')} variant="primary">回到牌組</Button>}
+        />
+      </PageShell>
     )
   }
 
   if (finished) {
     const accuracy = stats.total > 0 ? Math.round((stats.correct / stats.total) * 100) : 0
     return (
-      <div className="flex-1 flex flex-col items-center justify-center p-8 page-enter">
-        <div className="text-6xl mb-4">{accuracy >= 80 ? '🎉' : '💪'}</div>
-        <h2 className="text-2xl font-bold text-gray-800 mb-2 dark:text-white">測驗完成！</h2>
-        <div className="flex gap-8 my-6">
-          <div className="text-center">
-            <div className="text-3xl font-bold text-green-500">{stats.correct}</div>
-            <div className="text-sm text-gray-400">答對</div>
-          </div>
-          <div className="text-center">
-            <div className="text-3xl font-bold text-red-500">{stats.wrong}</div>
-            <div className="text-sm text-gray-400">答錯</div>
-          </div>
-          <div className="text-center">
-            <div className="text-3xl font-bold text-purple-500">{accuracy}%</div>
-            <div className="text-sm text-gray-400">正確率</div>
-          </div>
+      <PageShell className="flex flex-col">
+        <div className="flex flex-1 items-center justify-center">
+          <Surface className="w-full max-w-xl p-8 text-center">
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-300">
+              <ClipboardCheck className="h-9 w-9" />
+            </div>
+            <h2 className="text-2xl font-bold text-slate-900 dark:text-white">測驗完成</h2>
+            <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+              本次正確率 {accuracy}%，共作答 {stats.total} 題。
+            </p>
+            <div className="my-6 grid grid-cols-3 gap-3">
+              <StatPill label="答對" value={stats.correct} tone="emerald" />
+              <StatPill label="答錯" value={stats.wrong} tone="red" />
+              <StatPill label="正確率" value={`${accuracy}%`} tone="blue" />
+            </div>
+            <div className="flex flex-wrap justify-center gap-3">
+              <Button onClick={() => resetQuiz(buildQuizCards(cards, selectedDeckId))} variant="primary">
+                <RotateCcw className="h-4 w-4" />
+                再測一次
+              </Button>
+              <Button onClick={() => setView('cards')} variant="secondary">
+                回到牌組
+              </Button>
+            </div>
+          </Surface>
         </div>
-        <div className="flex gap-3">
-          <button
-            onClick={() => resetQuiz(buildQuizCards(cards, selectedDeckId))}
-            className="px-6 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg text-white font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 focus-visible:ring-offset-2"
-          >
-            再測一次
-          </button>
-          <button
-            onClick={() => setView('cards')}
-            className="px-6 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg text-gray-700 font-medium dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-400 focus-visible:ring-offset-2"
-          >
-            回到牌組
-          </button>
-        </div>
-      </div>
+      </PageShell>
     )
   }
 
   return (
-    <div className="flex-1 flex flex-col items-center p-8 page-enter">
-      <div className="w-full max-w-lg mb-2 text-sm text-gray-400 text-center">
-        第 {currentIndex + 1} / {quizCards.length} 題
-        {stats.total > 0 && (
-          <span className="ml-3 text-green-500">
-            ✓ {stats.correct}
-          </span>
-        )}
-        {stats.wrong > 0 && (
-          <span className="ml-1 text-red-500">
-            ✗ {stats.wrong}
-          </span>
-        )}
-      </div>
+    <PageShell>
+      <PageHeader
+        title="測驗模式"
+        subtitle={`第 ${currentIndex + 1} / ${quizCards.length} 題`}
+        actions={<Button onClick={() => setView('cards')} variant="secondary">回到牌組</Button>}
+      />
 
-      <div className="w-full max-w-lg bg-white rounded-xl shadow-lg border border-gray-200 p-6 mb-6 dark:bg-gray-800 dark:border-gray-700">
-        <div className="prose prose-sm max-w-none mb-6 dark:prose-invert">
-          <ReactMarkdown remarkPlugins={[remarkGfm]} components={{ img: MarkdownImage }}>{current.front}</ReactMarkdown>
-        </div>
+      <div className="mx-auto w-full max-w-2xl">
+        <Surface className="mb-5 p-4">
+          <div className="mb-2 flex items-center justify-between text-sm">
+            <span className="font-medium text-slate-700 dark:text-slate-200">測驗進度</span>
+            <span className="text-slate-500 dark:text-slate-400">
+              ✓ {stats.correct} · ✕ {stats.wrong} · {progressPercent}%
+            </span>
+          </div>
+          <ProgressBar value={progressPercent} tone="blue" />
+        </Surface>
 
-        <div className="space-y-3">
-          <input
-            value={userAnswer}
-            onChange={(event) => setUserAnswer(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') {
-                if (showAnswer) handleNext()
-                else handleSubmit()
-              }
-            }}
-            placeholder="輸入你的答案..."
-            disabled={showAnswer}
-            className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-purple-400 focus:border-transparent outline-none disabled:bg-gray-100 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:disabled:bg-gray-800"
-            autoFocus
-          />
-
-          {!showAnswer ? (
-            <button
-              onClick={handleSubmit}
-              disabled={!userAnswer.trim()}
-              className="w-full px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-purple-300 rounded-lg text-white font-medium disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 focus-visible:ring-offset-2"
-            >
-              提交答案
-            </button>
-          ) : (
-            <div>
-              <div className={`p-3 rounded-lg text-sm mb-3 ${
-                answers[currentIndex]
-                  ? 'bg-green-50 text-green-700 border border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800'
-                  : 'bg-red-50 text-red-700 border border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800'
-              }`}>
-                <div className="font-medium mb-1">
-                  {answers[currentIndex] ? '✅ 正確！' : '❌ 錯誤！'}
-                </div>
-                <div>
-                  正確答案：{' '}
-                  <span className="font-medium">{current.back}</span>
-                </div>
-              </div>
-              <button
-                onClick={handleNext}
-                className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-white font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2"
-              >
-                {currentIndex + 1 >= quizCards.length ? '查看結果' : '下一題'}
-              </button>
+        <Surface className="overflow-hidden">
+          <div className="border-b border-slate-100 p-6 dark:border-slate-800">
+            <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-400">題目</div>
+            <div className="prose prose-sm max-w-none dark:prose-invert">
+              <ReactMarkdown remarkPlugins={[remarkGfm]} components={{ img: MarkdownImage }}>{current.front}</ReactMarkdown>
             </div>
-          )}
-        </div>
-      </div>
+          </div>
 
-      <button
-        onClick={() => setView('cards')}
-        className="text-sm text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-400 focus-visible:ring-offset-2"
-      >
-        ← 回到牌組
-      </button>
-    </div>
+          <div className="space-y-4 p-6">
+            <input
+              value={userAnswer}
+              onChange={(event) => setUserAnswer(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  if (showAnswer) handleNext()
+                  else handleSubmit()
+                }
+              }}
+              placeholder="輸入你的答案..."
+              disabled={showAnswer}
+              className="h-12 w-full rounded-lg border border-slate-200 bg-slate-50 px-4 text-sm outline-none transition-colors placeholder:text-slate-400 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-white dark:focus:border-blue-500 dark:focus:ring-blue-950 dark:disabled:bg-slate-900"
+              autoFocus
+            />
+
+            {!showAnswer ? (
+              <Button
+                onClick={handleSubmit}
+                disabled={!userAnswer.trim()}
+                variant="primary"
+                className="w-full"
+              >
+                提交答案
+              </Button>
+            ) : (
+              <div className="space-y-4">
+                <div className={`rounded-xl border p-4 text-sm ${
+                  answers[currentIndex]
+                    ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-300'
+                    : 'border-red-200 bg-red-50 text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300'
+                }`}>
+                  <div className="mb-2 flex items-center gap-2 font-semibold">
+                    {answers[currentIndex] ? <CheckCircle2 className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}
+                    {answers[currentIndex] ? '正確' : '錯誤'}
+                  </div>
+                  <div>
+                    正確答案：<span className="font-medium">{current.back}</span>
+                  </div>
+                </div>
+                <Button onClick={handleNext} variant="primary" className="w-full">
+                  {currentIndex + 1 >= quizCards.length ? '查看結果' : '下一題'}
+                </Button>
+              </div>
+            )}
+          </div>
+        </Surface>
+      </div>
+    </PageShell>
   )
 }

@@ -1,8 +1,12 @@
 import { useState } from 'react'
+import { BookOpenCheck, Brain, FileQuestion, Plus, RotateCcw, Trash2 } from 'lucide-react'
 import { useAppContext } from '../hooks/useAppData'
 import { CardEditor } from './CardEditor'
 import { FlipCard } from './FlipCard'
 import { StarRating } from './StarRating'
+import { Button, EmptyState, PageHeader, PageShell, ProgressBar, StatPill, Surface } from './ui'
+import { getCardPreviewText } from '../utils/cardPreview'
+import { getDeckProgress } from '../utils/reviewProgress'
 import type { Card } from '../types'
 
 export function DeckView() {
@@ -26,6 +30,7 @@ export function DeckView() {
   const currentPreviewCard = previewCard
     ? cards.find((card) => card.id === previewCard.id) ?? previewCard
     : null
+  const progress = getDeckProgress(cards, selectedDeckId ?? '', new Date().toISOString().split('T')[0])
 
   function handleSave(front: string, back: string) {
     if (editingCard) {
@@ -49,94 +54,125 @@ export function DeckView() {
 
   if (currentPreviewCard) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center p-8 page-enter">
-        <button
-          onClick={() => {
-            setPreviewCard(null)
-            setPreviewFlipped(false)
-          }}
-          className="self-start mb-4 text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-        >
-          返回卡片列表
-        </button>
-
-        <FlipCard
-          front={currentPreviewCard.front}
-          back={currentPreviewCard.back}
-          flipped={previewFlipped}
-          onFlip={() => setPreviewFlipped(!previewFlipped)}
+      <PageShell className="flex flex-col">
+        <PageHeader
+          title="卡片預覽"
+          subtitle={deck?.name ?? '牌組'}
+          actions={(
+            <Button
+              onClick={() => {
+                setPreviewCard(null)
+                setPreviewFlipped(false)
+              }}
+              variant="secondary"
+            >
+              回到列表
+            </Button>
+          )}
         />
 
-        <div className="mt-4">
-          <StarRating
-            value={currentPreviewCard.starRating}
-            onChange={(value) => updateCardStarRating(currentPreviewCard.id, value)}
+        <div className="flex flex-1 flex-col items-center justify-center">
+          <FlipCard
+            front={currentPreviewCard.front}
+            back={currentPreviewCard.back}
+            flipped={previewFlipped}
+            onFlip={() => setPreviewFlipped(!previewFlipped)}
           />
-        </div>
 
-        {!previewFlipped && (
-          <p className="mt-4 text-sm text-gray-400">點擊卡片查看背面</p>
-        )}
-      </div>
+          <div className="mt-5 flex flex-col items-center gap-3">
+            <StarRating
+              value={currentPreviewCard.starRating}
+              onChange={(value) => updateCardStarRating(currentPreviewCard.id, value)}
+            />
+            {!previewFlipped && (
+              <p className="text-sm text-slate-400">點擊卡片查看背面</p>
+            )}
+          </div>
+        </div>
+      </PageShell>
     )
   }
 
   return (
-    <div className="flex-1 flex flex-col p-6 page-enter">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-800 dark:text-white">{deck?.name ?? '牌組'}</h2>
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            {deckCards.length} 張卡片
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <button
-            onClick={() => setView('review')}
-            disabled={deckCards.length === 0}
-            className="px-4 py-2 text-sm bg-green-600 hover:bg-green-700 disabled:bg-green-300 rounded-lg text-white font-medium disabled:cursor-not-allowed"
-          >
-            複習模式
-          </button>
-          <button
-            onClick={() => setView('quiz')}
-            disabled={deckCards.length === 0}
-            className="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 rounded-lg text-white font-medium disabled:cursor-not-allowed"
-          >
-            測驗模式
-          </button>
-          <button
-            onClick={startAdd}
-            className="px-4 py-2 text-sm bg-purple-600 hover:bg-purple-700 rounded-lg text-white font-medium"
-          >
-            + 新增卡片
-          </button>
-        </div>
+    <PageShell>
+      <PageHeader
+        title={deck?.name ?? '牌組'}
+        subtitle={deck?.description || '管理卡片、預覽內容，或開始複習與測驗。'}
+        actions={(
+          <>
+            <Button
+              onClick={() => setView('review')}
+              disabled={deckCards.length === 0}
+              variant="success"
+            >
+              <BookOpenCheck className="h-4 w-4" />
+              複習模式
+            </Button>
+            <Button
+              onClick={() => setView('quiz')}
+              disabled={deckCards.length === 0}
+              variant="primary"
+            >
+              <FileQuestion className="h-4 w-4" />
+              測驗模式
+            </Button>
+            <Button onClick={startAdd} variant="secondary">
+              <Plus className="h-4 w-4" />
+              新增卡片
+            </Button>
+          </>
+        )}
+      />
+
+      <div className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <StatPill label="卡片" value={`${progress.totalCards} 張`} tone="blue" />
+        <StatPill label="已學" value={`${progress.learnedCards} 張`} tone="emerald" />
+        <StatPill label="待複習" value={`${progress.dueCards} 張`} tone={progress.dueCards > 0 ? 'amber' : 'emerald'} />
+        <StatPill label="新卡" value={`${progress.newCards} 張`} />
       </div>
 
-      <div className="flex-1 overflow-y-auto">
-        {deckCards.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-gray-400 dark:text-gray-500">
-            <div className="text-6xl mb-4">&#x1F4DD;</div>
-            <p className="text-lg">還沒有卡片</p>
-            <p className="text-sm mt-1">點擊「新增卡片」開始建立題庫。</p>
+      {deckCards.length > 0 && (
+        <Surface className="mb-6 p-4">
+          <div className="mb-2 flex items-center justify-between text-sm">
+            <span className="font-medium text-slate-700 dark:text-slate-200">已學進度</span>
+            <span className="text-slate-500 dark:text-slate-400">{progress.learnedPercent}%</span>
           </div>
-        ) : (
-          <div className="grid gap-4 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
-            {deckCards.map((card) => (
-              <div
-                key={card.id}
-                className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 hover:shadow-md transition-shadow cursor-pointer group dark:bg-gray-800 dark:border-gray-700"
-                onClick={() => setPreviewCard(card)}
-              >
-                <div className="flex items-start justify-between gap-3 mb-2">
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium text-gray-800 line-clamp-2 dark:text-white">
-                      {card.front.replace(/[#*`>[\]!()~]/g, '').substring(0, 100)}
+          <ProgressBar value={progress.learnedPercent} />
+        </Surface>
+      )}
+
+      {deckCards.length === 0 ? (
+        <EmptyState
+          icon={<Brain className="h-7 w-7" />}
+          title="還沒有卡片"
+          description="新增第一張卡片後，就可以開始預覽、複習與測驗。"
+          action={(
+            <Button onClick={startAdd} variant="primary">
+              <Plus className="h-4 w-4" />
+              新增卡片
+            </Button>
+          )}
+        />
+      ) : (
+        <div className="grid gap-4 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
+          {deckCards.map((card) => (
+            <Surface
+              key={card.id}
+              className="group cursor-pointer p-4 transition-all hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-md dark:hover:border-blue-900"
+            >
+              <div onClick={() => setPreviewCard(card)} role="button" tabIndex={0}>
+                <div className="mb-4 flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="mb-2 flex items-center gap-2 text-xs font-medium text-slate-400">
+                      <RotateCcw className="h-3.5 w-3.5" />
+                      {card.repetitions > 0 ? `下次 ${card.nextReview}` : '新卡'}
                     </div>
-                    <div className="text-xs text-gray-400 mt-1 line-clamp-2 dark:text-gray-500">
-                      {card.back.replace(/[#*`>[\]!()~]/g, '').substring(0, 100)}
-                    </div>
+                    <h3 className="line-clamp-2 text-sm font-semibold leading-6 text-slate-900 dark:text-white">
+                      {getCardPreviewText(card.front)}
+                    </h3>
+                    <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-500 dark:text-slate-400">
+                      {getCardPreviewText(card.back)}
+                    </p>
                   </div>
                   <StarRating
                     value={card.starRating}
@@ -144,38 +180,42 @@ export function DeckView() {
                     size="sm"
                   />
                 </div>
-                <div className="flex items-center justify-between text-xs text-gray-400 dark:text-gray-500">
+
+                <div className="flex items-center justify-between gap-3 border-t border-slate-100 pt-3 text-xs text-slate-400 dark:border-slate-800 dark:text-slate-500">
                   <span>
                     {card.repetitions > 0
-                      ? `間隔: ${card.interval} 天 · 下次: ${card.nextReview}`
-                      : '新卡'}
+                      ? `間隔 ${card.interval} 天`
+                      : '尚未複習'}
                   </span>
-                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button
+                  <div className="flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                    <Button
                       onClick={(event) => {
                         event.stopPropagation()
                         startEdit(card)
                       }}
-                      className="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-300"
+                      variant="ghost"
+                      size="sm"
                     >
                       編輯
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       onClick={(event) => {
                         event.stopPropagation()
                         deleteCard(card.id)
                       }}
-                      className="px-2 py-1 text-xs bg-red-50 hover:bg-red-100 text-red-600 rounded dark:bg-red-900/30 dark:hover:bg-red-900/50 dark:text-red-400"
+                      variant="danger"
+                      size="sm"
                     >
+                      <Trash2 className="h-3.5 w-3.5" />
                       刪除
-                    </button>
+                    </Button>
                   </div>
                 </div>
               </div>
-            ))}
-          </div>
-        )}
-      </div>
+            </Surface>
+          ))}
+        </div>
+      )}
 
       {showEditor && (
         <CardEditor
@@ -189,6 +229,6 @@ export function DeckView() {
           }}
         />
       )}
-    </div>
+    </PageShell>
   )
 }
