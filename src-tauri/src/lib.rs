@@ -20,6 +20,12 @@ pub struct Card {
     pub last_review: String,
     #[serde(rename = "starRating", default)]
     pub star_rating: u32,
+    #[serde(rename = "mistakeCount", default)]
+    pub mistake_count: u32,
+    #[serde(rename = "lastMistakeAt", default)]
+    pub last_mistake_at: Option<String>,
+    #[serde(rename = "isMistake", default)]
+    pub is_mistake: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

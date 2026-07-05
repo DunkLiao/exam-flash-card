@@ -9,6 +9,9 @@ export interface Card {
   nextReview: string
   lastReview: string
   starRating: number
+  mistakeCount: number
+  lastMistakeAt: string | null
+  isMistake: boolean
 }
 
 export interface Deck {
@@ -23,7 +26,7 @@ export interface AppData {
   cards: Card[]
 }
 
-export type View = 'decks' | 'cards' | 'review' | 'quiz' | 'import'
+export type View = 'decks' | 'cards' | 'review' | 'mistakeReview' | 'dailyTask' | 'quiz' | 'import'
 export type Rating = 'again' | 'hard' | 'good' | 'easy'
 
 export interface QuizState {

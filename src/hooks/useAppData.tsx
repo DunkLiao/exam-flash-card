@@ -2,7 +2,13 @@ import { createContext, useContext, useState, useCallback, useEffect } from 'rea
 import type { AppData, Deck, Card, View } from '../types'
 import { loadData, saveData, deleteUnusedImages } from '../utils/fileIO'
 import { collectImageFilenames, shouldCleanupImagesAfterChange, type ImageCleanupChange } from '../utils/imageRefs'
-import { normalizeStarRating, withNormalizedCardMetadata } from '../utils/reviewProgress'
+import { normalizeCardSrs } from '../utils/srs'
+import {
+  clearCardMistake as clearCardMistakeMetadata,
+  markCardMistake as markCardMistakeMetadata,
+  normalizeStarRating,
+  withNormalizedCardMetadata,
+} from '../utils/reviewProgress'
 
 function generateId(): string {
   return crypto.randomUUID()
@@ -24,6 +30,8 @@ interface AppContextType {
   deleteCard: (id: string) => void
   updateCardSRS: (id: string, updates: Partial<Card>) => void
   updateCardStarRating: (id: string, starRating: number) => void
+  markCardMistake: (id: string, date?: string) => void
+  clearCardMistake: (id: string) => void
   loading: boolean
   refreshData: () => Promise<void>
 }
@@ -48,7 +56,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (d) {
         setData({
           ...d,
-          cards: d.cards.map(withNormalizedCardMetadata),
+          cards: d.cards.map((card) => normalizeCardSrs(withNormalizedCardMetadata(card))),
         })
       }
     } catch {
@@ -120,6 +128,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       nextReview: now,
       lastReview: now,
       starRating: 0,
+      mistakeCount: 0,
+      lastMistakeAt: null,
+      isMistake: false,
     }
     const newData = { ...data, cards: [...data.cards, card] }
     persist(newData)
@@ -146,7 +157,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const updateCardSRS = useCallback((id: string, updates: Partial<Card>) => {
     const newData = {
       ...data,
-      cards: data.cards.map((c) => (c.id === id ? { ...c, ...updates } : c)),
+      cards: data.cards.map((c) => (c.id === id ? normalizeCardSrs({ ...c, ...updates }) : c)),
     }
     persist(newData)
   }, [data, persist])
@@ -156,6 +167,26 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       ...data,
       cards: data.cards.map((c) => (
         c.id === id ? { ...c, starRating: normalizeStarRating(starRating) } : c
+      )),
+    }
+    persist(newData)
+  }, [data, persist])
+
+  const markCardMistake = useCallback((id: string, date = new Date().toISOString().split('T')[0]) => {
+    const newData = {
+      ...data,
+      cards: data.cards.map((c) => (
+        c.id === id ? markCardMistakeMetadata(c, date) : c
+      )),
+    }
+    persist(newData)
+  }, [data, persist])
+
+  const clearCardMistake = useCallback((id: string) => {
+    const newData = {
+      ...data,
+      cards: data.cards.map((c) => (
+        c.id === id ? clearCardMistakeMetadata(c) : c
       )),
     }
     persist(newData)
@@ -185,6 +216,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         deleteCard,
         updateCardSRS,
         updateCardStarRating,
+        markCardMistake,
+        clearCardMistake,
         loading,
         refreshData,
       }}

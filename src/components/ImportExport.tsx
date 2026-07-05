@@ -126,7 +126,7 @@ export function ImportExport() {
     <PageShell>
       <PageHeader
         title="匯入 / 匯出"
-        subtitle="備份完整資料，或用 CSV 與 Excel 交換卡片內容。"
+        subtitle="用 JSON 備份完整學習狀態，或用 CSV 與 Excel 交換卡片內容。"
         actions={<Button onClick={() => setView('decks')} variant="secondary">回到牌組列表</Button>}
       />
 
@@ -134,14 +134,14 @@ export function ImportExport() {
         <TransferPanel
           icon={<FileDown className="h-5 w-5" />}
           title="匯出"
-          description="建立備份或提供 Excel 可讀的卡片資料。"
+          description="JSON 會保留 SRS、星等與錯題狀態；CSV 只保留適合 Excel 編輯的卡片內容。"
           actions={(
             <>
-              <Button onClick={handleExportJSON} variant="primary" className="w-full justify-start" size="lg">
+              <Button onClick={handleExportJSON} variant="warning" className="w-full justify-start" size="lg">
                 <DatabaseBackup className="h-4 w-4" />
-                匯出為 JSON（完整備份，含 SRS 進度）
+                匯出為 JSON（完整備份，含 SRS 與錯題）
               </Button>
-              <Button onClick={handleExportCSV} variant="secondary" className="w-full justify-start" size="lg">
+              <Button onClick={handleExportCSV} variant="warning" className="w-full justify-start" size="lg">
                 <FileSpreadsheet className="h-4 w-4" />
                 匯出為 CSV（Excel 相容）
               </Button>
@@ -152,14 +152,14 @@ export function ImportExport() {
         <TransferPanel
           icon={<FileUp className="h-5 w-5" />}
           title="匯入"
-          description="匯入時會略過重複卡片，保留既有資料。"
+          description="匯入時會略過重複卡片；舊 JSON 會自動補齊缺少的錯題欄位。"
           actions={(
             <>
               <Button onClick={handleImportJSON} variant="success" className="w-full justify-start" size="lg">
                 <DatabaseBackup className="h-4 w-4" />
                 從 JSON 匯入（完整備份還原）
               </Button>
-              <Button onClick={handleImportCSV} variant="primary" className="w-full justify-start" size="lg">
+              <Button onClick={handleImportCSV} variant="success" className="w-full justify-start" size="lg">
                 <FileSpreadsheet className="h-4 w-4" />
                 從 CSV 匯入（Excel 匯出格式）
               </Button>
@@ -170,7 +170,7 @@ export function ImportExport() {
 
       <Surface className="mx-auto mt-4 max-w-4xl p-4 text-sm text-slate-500 dark:text-slate-400">
         CSV 欄位：<span className="font-medium text-slate-700 dark:text-slate-200">deckName, front, back, starRating</span>。
-        deckName 可省略，預設為 Default。
+        deckName 可省略，預設為 Default；CSV 不包含錯題狀態，完整備份請使用 JSON。
       </Surface>
 
       {message && (

@@ -1,12 +1,13 @@
 import type { ButtonHTMLAttributes, ReactNode } from 'react'
 
-type ButtonVariant = 'primary' | 'secondary' | 'success' | 'danger' | 'ghost'
+type ButtonVariant = 'primary' | 'secondary' | 'success' | 'warning' | 'danger' | 'ghost'
 type ButtonSize = 'sm' | 'md' | 'lg'
 
 const buttonVariants: Record<ButtonVariant, string> = {
   primary: 'bg-blue-600 text-white hover:bg-blue-700 disabled:bg-blue-300 dark:disabled:bg-blue-900/50',
   secondary: 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 disabled:bg-slate-100 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700 dark:hover:bg-slate-700',
   success: 'bg-emerald-600 text-white hover:bg-emerald-700 disabled:bg-emerald-300 dark:disabled:bg-emerald-900/50',
+  warning: 'bg-amber-500 text-white hover:bg-amber-600 disabled:bg-amber-300 dark:disabled:bg-amber-900/50',
   danger: 'bg-red-50 text-red-600 border border-red-100 hover:bg-red-100 disabled:bg-red-50 dark:bg-red-950/30 dark:text-red-300 dark:border-red-900/60 dark:hover:bg-red-950/50',
   ghost: 'text-slate-500 hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100',
 }
@@ -76,10 +77,12 @@ export function Surface({ children, className = '' }: { children: ReactNode; cla
 export function StatPill({
   label,
   value,
+  description,
   tone = 'slate',
 }: {
   label: string
   value: ReactNode
+  description?: ReactNode
   tone?: 'slate' | 'blue' | 'emerald' | 'amber' | 'red'
 }) {
   const tones = {
@@ -94,6 +97,9 @@ export function StatPill({
     <div className={`rounded-lg px-3 py-2 ${tones[tone]}`}>
       <div className="text-[11px] font-medium uppercase tracking-wide opacity-75">{label}</div>
       <div className="text-sm font-semibold">{value}</div>
+      {description && (
+        <div className="mt-1 text-[11px] leading-4 opacity-75">{description}</div>
+      )}
     </div>
   )
 }

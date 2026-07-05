@@ -29,7 +29,9 @@ export default function App() {
       <main className="flex min-w-0 flex-1 overflow-hidden">
         {view === 'decks' && <DeckList />}
         {view === 'cards' && selectedDeckId && <DeckView />}
-        {view === 'review' && selectedDeckId && <ReviewMode />}
+        {view === 'review' && selectedDeckId && <ReviewMode mode="review" />}
+        {view === 'mistakeReview' && selectedDeckId && <ReviewMode mode="mistake" />}
+        {view === 'dailyTask' && selectedDeckId && <ReviewMode mode="daily" />}
         {view === 'quiz' && selectedDeckId && <QuizMode />}
         {view === 'import' && <ImportExport />}
         {view === 'cards' && !selectedDeckId && <DeckList />}
@@ -47,6 +49,7 @@ function DeckList() {
   const learnedCards = allProgress.reduce((sum, progress) => sum + progress.learnedCards, 0)
   const dueCards = allProgress.reduce((sum, progress) => sum + progress.dueCards, 0)
   const newCards = allProgress.reduce((sum, progress) => sum + progress.newCards, 0)
+  const mistakeCards = allProgress.reduce((sum, progress) => sum + progress.mistakeCards, 0)
   const learnedPercent = totalCards === 0 ? 0 : Math.round((learnedCards / totalCards) * 100)
 
   return (
@@ -62,11 +65,12 @@ function DeckList() {
         )}
       />
 
-      <div className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         <StatPill label="牌組" value={`${decks.length} 組`} tone="blue" />
         <StatPill label="總卡片" value={`${totalCards} 張`} />
         <StatPill label="待複習" value={`${dueCards} 張`} tone={dueCards > 0 ? 'amber' : 'emerald'} />
         <StatPill label="新卡" value={`${newCards} 張`} tone="slate" />
+        <StatPill label="錯題" value={`${mistakeCards} 張`} tone={mistakeCards > 0 ? 'red' : 'slate'} />
       </div>
 
       {decks.length > 0 && (
@@ -130,7 +134,7 @@ function DeckList() {
                     <ProgressBar value={progress.learnedPercent} />
                   </div>
 
-                  <div className="grid grid-cols-3 gap-2 text-xs">
+                  <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
                     <div className="rounded-lg bg-slate-50 p-2 dark:bg-slate-800/70">
                       <div className="text-slate-400">卡片</div>
                       <div className="font-semibold text-slate-700 dark:text-slate-200">{progress.totalCards}</div>
@@ -142,6 +146,10 @@ function DeckList() {
                     <div className="rounded-lg bg-blue-50 p-2 text-blue-700 dark:bg-blue-950/30 dark:text-blue-300">
                       <div className="opacity-75">新卡</div>
                       <div className="font-semibold">{progress.newCards}</div>
+                    </div>
+                    <div className="rounded-lg bg-red-50 p-2 text-red-700 dark:bg-red-950/30 dark:text-red-300">
+                      <div className="opacity-75">錯題</div>
+                      <div className="font-semibold">{progress.mistakeCards}</div>
                     </div>
                   </div>
 

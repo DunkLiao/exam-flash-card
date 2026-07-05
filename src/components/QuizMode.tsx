@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { CheckCircle2, ClipboardCheck, RotateCcw, XCircle } from 'lucide-react'
 import { useAppContext } from '../hooks/useAppData'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { MarkdownImage } from './MarkdownImage'
 import { Button, EmptyState, PageHeader, PageShell, ProgressBar, StatPill, Surface } from './ui'
+import { getNowDateStr } from '../utils/srs'
 import type { Card } from '../types'
 
 function buildQuizCards(cards: Card[], deckId: string | null): Card[] {
@@ -13,13 +14,22 @@ function buildQuizCards(cards: Card[], deckId: string | null): Card[] {
 }
 
 export function QuizMode() {
-  const { cards, selectedDeckId, setView } = useAppContext()
+  const { cards, selectedDeckId, markCardMistake, setView } = useAppContext()
   const [quizCards, setQuizCards] = useState<Card[]>(() => buildQuizCards(cards, selectedDeckId))
   const [currentIndex, setCurrentIndex] = useState(0)
   const [userAnswer, setUserAnswer] = useState('')
   const [showAnswer, setShowAnswer] = useState(false)
   const [answers, setAnswers] = useState<(boolean | null)[]>(() => new Array(quizCards.length).fill(null))
   const [finished, setFinished] = useState(false)
+  const previousQuizSourceSignature = useRef<string | null>(null)
+  const quizSourceSignature = useMemo(() => (
+    `${selectedDeckId ?? ''}:${
+      cards
+      .filter((card) => card.deckId === selectedDeckId)
+      .map((card) => JSON.stringify([card.id, card.front, card.back]))
+      .join('|')
+    }`
+  ), [cards, selectedDeckId])
 
   const resetQuiz = useCallback((nextCards: Card[]) => {
     setQuizCards(nextCards)
@@ -31,14 +41,19 @@ export function QuizMode() {
   }, [])
 
   useEffect(() => {
+    if (previousQuizSourceSignature.current === quizSourceSignature) return
+    previousQuizSourceSignature.current = quizSourceSignature
     resetQuiz(buildQuizCards(cards, selectedDeckId))
-  }, [cards, resetQuiz, selectedDeckId])
+  }, [cards, quizSourceSignature, resetQuiz, selectedDeckId])
 
   const current = quizCards[currentIndex]
 
   function handleSubmit() {
     if (finished || !current) return
     const correct = userAnswer.trim().toLowerCase() === current.back.trim().toLowerCase()
+    if (!correct) {
+      markCardMistake(current.id, getNowDateStr())
+    }
     const newAnswers = [...answers]
     newAnswers[currentIndex] = correct
     setAnswers(newAnswers)

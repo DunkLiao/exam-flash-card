@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { BookOpenCheck, Brain, FileQuestion, Plus, RotateCcw, Trash2 } from 'lucide-react'
+import { AlertTriangle, BookOpenCheck, Brain, CalendarClock, FileQuestion, ListChecks, Plus, RotateCcw, Trash2 } from 'lucide-react'
 import { useAppContext } from '../hooks/useAppData'
 import { CardEditor } from './CardEditor'
 import { FlipCard } from './FlipCard'
@@ -18,6 +18,7 @@ export function DeckView() {
     updateCard,
     deleteCard,
     updateCardStarRating,
+    clearCardMistake,
     setView,
   } = useAppContext()
   const [showEditor, setShowEditor] = useState(false)
@@ -84,6 +85,32 @@ export function DeckView() {
               value={currentPreviewCard.starRating}
               onChange={(value) => updateCardStarRating(currentPreviewCard.id, value)}
             />
+            {currentPreviewCard.isMistake && (
+              <div className="flex flex-wrap items-center justify-center gap-2 text-sm">
+                <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-3 py-1 font-semibold text-red-700 dark:bg-red-950/40 dark:text-red-300">
+                  <AlertTriangle className="h-4 w-4" />
+                  錯題
+                </span>
+                <span className="text-slate-500 dark:text-slate-400">
+                  累計錯 {currentPreviewCard.mistakeCount} 次
+                  {currentPreviewCard.lastMistakeAt ? `，最近 ${currentPreviewCard.lastMistakeAt}` : ''}
+                </span>
+                <Button
+                  onClick={() => clearCardMistake(currentPreviewCard.id)}
+                  variant="ghost"
+                  size="sm"
+                >
+                  解除錯題
+                </Button>
+              </div>
+            )}
+            {!currentPreviewCard.isMistake && currentPreviewCard.mistakeCount > 0 && (
+              <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+                <CalendarClock className="h-4 w-4" />
+                歷史錯 {currentPreviewCard.mistakeCount} 次
+                {currentPreviewCard.lastMistakeAt ? `，最近 ${currentPreviewCard.lastMistakeAt}` : ''}
+              </div>
+            )}
             {!previewFlipped && (
               <p className="text-sm text-slate-400">點擊卡片查看背面</p>
             )}
@@ -109,6 +136,22 @@ export function DeckView() {
               複習模式
             </Button>
             <Button
+              onClick={() => setView('mistakeReview')}
+              disabled={progress.mistakeCards === 0}
+              variant="danger"
+            >
+              <AlertTriangle className="h-4 w-4" />
+              錯題練習
+            </Button>
+            <Button
+              onClick={() => setView('dailyTask')}
+              disabled={deckCards.length === 0}
+              variant="secondary"
+            >
+              <ListChecks className="h-4 w-4" />
+              今日任務
+            </Button>
+            <Button
               onClick={() => setView('quiz')}
               disabled={deckCards.length === 0}
               variant="primary"
@@ -124,11 +167,18 @@ export function DeckView() {
         )}
       />
 
-      <div className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
         <StatPill label="卡片" value={`${progress.totalCards} 張`} tone="blue" />
         <StatPill label="已學" value={`${progress.learnedCards} 張`} tone="emerald" />
         <StatPill label="待複習" value={`${progress.dueCards} 張`} tone={progress.dueCards > 0 ? 'amber' : 'emerald'} />
         <StatPill label="新卡" value={`${progress.newCards} 張`} />
+        <StatPill label="錯題" value={`${progress.mistakeCards} 張`} tone={progress.mistakeCards > 0 ? 'red' : 'slate'} />
+        <StatPill
+          label="建議加強"
+          value={`${progress.suggestedCards} 張`}
+          description="錯題、曾錯或 1-2 星"
+          tone={progress.suggestedCards > 0 ? 'amber' : 'slate'}
+        />
       </div>
 
       {deckCards.length > 0 && (
@@ -166,6 +216,12 @@ export function DeckView() {
                     <div className="mb-2 flex items-center gap-2 text-xs font-medium text-slate-400">
                       <RotateCcw className="h-3.5 w-3.5" />
                       {card.repetitions > 0 ? `下次 ${card.nextReview}` : '新卡'}
+                      {card.isMistake && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-semibold text-red-700 dark:bg-red-950/40 dark:text-red-300">
+                          <AlertTriangle className="h-3 w-3" />
+                          錯題
+                        </span>
+                      )}
                     </div>
                     <h3 className="line-clamp-2 text-sm font-semibold leading-6 text-slate-900 dark:text-white">
                       {getCardPreviewText(card.front)}
@@ -182,12 +238,31 @@ export function DeckView() {
                 </div>
 
                 <div className="flex items-center justify-between gap-3 border-t border-slate-100 pt-3 text-xs text-slate-400 dark:border-slate-800 dark:text-slate-500">
-                  <span>
-                    {card.repetitions > 0
-                      ? `間隔 ${card.interval} 天`
-                      : '尚未複習'}
-                  </span>
+                  <div className="min-w-0">
+                    <span>
+                      {card.repetitions > 0
+                        ? `間隔 ${card.interval} 天`
+                        : '尚未複習'}
+                    </span>
+                    {card.mistakeCount > 0 && (
+                      <span className="ml-2 text-red-500 dark:text-red-300">
+                        錯 {card.mistakeCount} 次
+                      </span>
+                    )}
+                  </div>
                   <div className="flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                    {card.isMistake && (
+                      <Button
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          clearCardMistake(card.id)
+                        }}
+                        variant="ghost"
+                        size="sm"
+                      >
+                        解除錯題
+                      </Button>
+                    )}
                     <Button
                       onClick={(event) => {
                         event.stopPropagation()
