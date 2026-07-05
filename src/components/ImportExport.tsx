@@ -1,8 +1,14 @@
-import { useState } from 'react'
-import { DatabaseBackup, FileDown, FileSpreadsheet, FileUp } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { DatabaseBackup, FileDown, FileSpreadsheet, FileText, FileUp } from 'lucide-react'
 import { useAppContext } from '../hooks/useAppData'
 import { openFileDialog, saveFileDialog, exportToFile, readImportFile, saveData } from '../utils/fileIO'
-import { buildCardsFromCsvRows, mergeImportedData, type CsvImportRow } from '../utils/importMerge'
+import {
+  buildCardsForDeckFromAnkiRows,
+  buildCardsFromCsvRows,
+  mergeImportedData,
+  parseAnkiTsvRows,
+  type CsvImportRow,
+} from '../utils/importMerge'
 import { Button, PageHeader, PageShell, Surface } from './ui'
 import type { AppData } from '../types'
 
@@ -10,6 +16,17 @@ export function ImportExport() {
   const { data, refreshData, setView } = useAppContext()
   const [message, setMessage] = useState('')
   const [msgType, setMsgType] = useState<'success' | 'error'>('success')
+  const [selectedAnkiDeckId, setSelectedAnkiDeckId] = useState(data.decks[0]?.id ?? '')
+
+  useEffect(() => {
+    if (data.decks.length === 0) {
+      setSelectedAnkiDeckId('')
+      return
+    }
+    if (!data.decks.some((deck) => deck.id === selectedAnkiDeckId)) {
+      setSelectedAnkiDeckId(data.decks[0].id)
+    }
+  }, [data.decks, selectedAnkiDeckId])
 
   function showMsg(text: string, type: 'success' | 'error') {
     setMessage(text)
@@ -122,6 +139,36 @@ export function ImportExport() {
     }
   }
 
+  async function handleImportAnkiText() {
+    try {
+      if (!selectedAnkiDeckId) {
+        showMsg('請先建立牌組，再匯入 Anki 文字檔', 'error')
+        return
+      }
+
+      const path = await openFileDialog()
+      if (!path) return
+      const content = await readImportFile(path)
+      const parsed = parseAnkiTsvRows(content)
+      if (parsed.rows.length === 0) {
+        showMsg(`Anki 文字檔沒有可匯入的卡片，略過 ${parsed.invalidRows} 列無效資料`, 'error')
+        return
+      }
+
+      const now = new Date().toISOString().split('T')[0]
+      const result = buildCardsForDeckFromAnkiRows(data, selectedAnkiDeckId, parsed.rows, now)
+      await saveData(result.data)
+      await refreshData()
+      const deckName = data.decks.find((deck) => deck.id === selectedAnkiDeckId)?.name ?? '指定牌組'
+      showMsg(
+        `匯入 Anki 文字檔成功：已匯入「${deckName}」，新增 ${result.addedCards} 張卡片，略過 ${result.skippedCards} 張重複卡片、${parsed.invalidRows} 列無效資料`,
+        'success',
+      )
+    } catch (e) {
+      showMsg(`匯入 Anki 文字檔失敗：${String(e)}`, 'error')
+    }
+  }
+
   return (
     <PageShell>
       <PageHeader
@@ -166,11 +213,49 @@ export function ImportExport() {
             </>
           )}
         />
+
+        <TransferPanel
+          icon={<FileText className="h-5 w-5" />}
+          title="Anki 文字檔"
+          description="支援每列「正面 Tab 反面」的 Anki txt/tsv 匯出檔，匯入前請先指定目標牌組。"
+          actions={(
+            <>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-200">
+                匯入到牌組
+                <select
+                  value={selectedAnkiDeckId}
+                  onChange={(event) => setSelectedAnkiDeckId(event.target.value)}
+                  disabled={data.decks.length === 0}
+                  className="mt-2 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-blue-400 disabled:bg-slate-100 disabled:text-slate-400 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 dark:disabled:bg-slate-800"
+                >
+                  {data.decks.length === 0 ? (
+                    <option value="">請先建立牌組</option>
+                  ) : (
+                    data.decks.map((deck) => (
+                      <option key={deck.id} value={deck.id}>{deck.name}</option>
+                    ))
+                  )}
+                </select>
+              </label>
+              <Button
+                onClick={handleImportAnkiText}
+                variant="success"
+                className="w-full justify-start"
+                size="lg"
+                disabled={data.decks.length === 0}
+              >
+                <FileText className="h-4 w-4" />
+                從 Anki txt/tsv 匯入到指定牌組
+              </Button>
+            </>
+          )}
+        />
       </div>
 
       <Surface className="mx-auto mt-4 max-w-4xl p-4 text-sm text-slate-500 dark:text-slate-400">
         CSV 欄位：<span className="font-medium text-slate-700 dark:text-slate-200">deckName, front, back, starRating</span>。
         deckName 可省略，預設為 Default；CSV 不包含錯題狀態，完整備份請使用 JSON。
+        Anki 文字檔格式為每列 <span className="font-medium text-slate-700 dark:text-slate-200">正面 + Tab + 反面</span>，會匯入到上方選定牌組。
       </Surface>
 
       {message && (

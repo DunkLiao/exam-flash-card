@@ -1,3 +1,4 @@
+use encoding_rs::BIG5;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
@@ -44,7 +45,10 @@ pub struct AppData {
 }
 
 fn get_data_dir(app: &tauri::AppHandle) -> PathBuf {
-    let path = app.path().app_data_dir().expect("failed to get app data dir");
+    let path = app
+        .path()
+        .app_data_dir()
+        .expect("failed to get app data dir");
     fs::create_dir_all(&path).ok();
     path
 }
@@ -67,11 +71,7 @@ fn sanitize_filename(filename: &str) -> String {
 }
 
 fn is_supported_image(filename: &str) -> bool {
-    let ext = filename
-        .split('.')
-        .last()
-        .unwrap_or("")
-        .to_lowercase();
+    let ext = filename.split('.').last().unwrap_or("").to_lowercase();
     matches!(
         ext.as_str(),
         "png" | "jpg" | "jpeg" | "gif" | "webp" | "bmp" | "svg"
@@ -102,7 +102,8 @@ fn load_data(app: tauri::AppHandle) -> Result<AppData, String> {
 #[tauri::command]
 fn save_data(app: tauri::AppHandle, data: AppData) -> Result<(), String> {
     let path = get_data_file(&app);
-    let json = serde_json::to_string_pretty(&data).map_err(|e| format!("Failed to serialize: {}", e))?;
+    let json =
+        serde_json::to_string_pretty(&data).map_err(|e| format!("Failed to serialize: {}", e))?;
     fs::write(&path, json).map_err(|e| format!("Failed to write: {}", e))
 }
 
@@ -119,7 +120,11 @@ fn save_image(app: tauri::AppHandle, data: Vec<u8>, filename: String) -> Result<
 }
 
 #[tauri::command]
-fn import_image_file(app: tauri::AppHandle, path: String, filename: String) -> Result<String, String> {
+fn import_image_file(
+    app: tauri::AppHandle,
+    path: String,
+    filename: String,
+) -> Result<String, String> {
     let safe_name = sanitize_filename(&filename);
     if safe_name.is_empty() || !is_supported_image(&safe_name) || !is_supported_image(&path) {
         return Err("Unsupported image file".to_string());
@@ -194,7 +199,7 @@ async fn open_file_dialog(app: tauri::AppHandle) -> Result<Option<String>, Strin
     let file = app
         .dialog()
         .file()
-        .add_filter("Flashcard Files", &["json", "csv"])
+        .add_filter("Flashcard Files", &["json", "csv", "txt", "tsv"])
         .add_filter("All Files", &["*"])
         .blocking_pick_file();
 
@@ -206,14 +211,20 @@ async fn open_image_dialog(app: tauri::AppHandle) -> Result<Option<String>, Stri
     let file = app
         .dialog()
         .file()
-        .add_filter("Images", &["png", "jpg", "jpeg", "gif", "webp", "bmp", "svg"])
+        .add_filter(
+            "Images",
+            &["png", "jpg", "jpeg", "gif", "webp", "bmp", "svg"],
+        )
         .blocking_pick_file();
 
     Ok(file.map(|f| f.to_string()))
 }
 
 #[tauri::command]
-async fn save_file_dialog(app: tauri::AppHandle, default_name: String) -> Result<Option<String>, String> {
+async fn save_file_dialog(
+    app: tauri::AppHandle,
+    default_name: String,
+) -> Result<Option<String>, String> {
     let file = app
         .dialog()
         .file()
@@ -228,9 +239,95 @@ fn export_to_file(path: String, content: String) -> Result<(), String> {
     fs::write(&path, content).map_err(|e| format!("Failed to write: {}", e))
 }
 
+fn decode_utf16_bytes(bytes: &[u8], little_endian: bool) -> Result<String, String> {
+    if bytes.len() % 2 != 0 {
+        return Err("UTF-16 file has an odd byte length".to_string());
+    }
+
+    let units = bytes
+        .chunks_exact(2)
+        .map(|chunk| {
+            if little_endian {
+                u16::from_le_bytes([chunk[0], chunk[1]])
+            } else {
+                u16::from_be_bytes([chunk[0], chunk[1]])
+            }
+        })
+        .collect::<Vec<_>>();
+
+    String::from_utf16(&units).map_err(|e| format!("Failed to decode UTF-16: {}", e))
+}
+
+fn decode_import_text(bytes: &[u8]) -> Result<String, String> {
+    if bytes.starts_with(&[0xEF, 0xBB, 0xBF]) {
+        return std::str::from_utf8(&bytes[3..])
+            .map(|text| text.to_string())
+            .map_err(|e| format!("Failed to decode UTF-8 BOM file: {}", e));
+    }
+
+    if bytes.starts_with(&[0xFF, 0xFE]) {
+        return decode_utf16_bytes(&bytes[2..], true);
+    }
+
+    if bytes.starts_with(&[0xFE, 0xFF]) {
+        return decode_utf16_bytes(&bytes[2..], false);
+    }
+
+    if let Ok(text) = std::str::from_utf8(bytes) {
+        return Ok(text.to_string());
+    }
+
+    let (decoded, _, had_errors) = BIG5.decode(bytes);
+    if !had_errors {
+        return Ok(decoded.into_owned());
+    }
+
+    Err("Unsupported text encoding. Supported encodings: UTF-8, UTF-8 BOM, UTF-16 LE/BE with BOM, Big5/CP950.".to_string())
+}
+
 #[tauri::command]
 fn read_import_file(path: String) -> Result<String, String> {
-    fs::read_to_string(&path).map_err(|e| format!("Failed to read: {}", e))
+    let bytes = fs::read(&path).map_err(|e| format!("Failed to read: {}", e))?;
+    decode_import_text(&bytes)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::decode_import_text;
+
+    const SAMPLE: &str = "\u{554f}\u{984c}\t\u{7b54}\u{6848}\n";
+
+    #[test]
+    fn decodes_utf8_with_optional_bom() {
+        assert_eq!(decode_import_text(SAMPLE.as_bytes()).unwrap(), SAMPLE);
+
+        let mut bytes = vec![0xEF, 0xBB, 0xBF];
+        bytes.extend_from_slice(SAMPLE.as_bytes());
+        assert_eq!(decode_import_text(&bytes).unwrap(), SAMPLE);
+    }
+
+    #[test]
+    fn decodes_utf16_little_and_big_endian_with_bom() {
+        let utf16: Vec<u16> = SAMPLE.encode_utf16().collect();
+
+        let mut le = vec![0xFF, 0xFE];
+        for unit in &utf16 {
+            le.extend_from_slice(&unit.to_le_bytes());
+        }
+        assert_eq!(decode_import_text(&le).unwrap(), SAMPLE);
+
+        let mut be = vec![0xFE, 0xFF];
+        for unit in &utf16 {
+            be.extend_from_slice(&unit.to_be_bytes());
+        }
+        assert_eq!(decode_import_text(&be).unwrap(), SAMPLE);
+    }
+
+    #[test]
+    fn decodes_cp950_big5_traditional_chinese() {
+        let bytes = [0xB0, 0xDD, 0xC3, 0x44, 0x09, 0xB5, 0xAA, 0xAE, 0xD7, 0x0A];
+        assert_eq!(decode_import_text(&bytes).unwrap(), SAMPLE);
+    }
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]

@@ -16,6 +16,16 @@ export interface CsvImportRow {
   starRating?: string
 }
 
+export interface AnkiImportRow {
+  front: string
+  back: string
+}
+
+export interface AnkiParseResult {
+  rows: AnkiImportRow[]
+  invalidRows: number
+}
+
 function generateId(): string {
   return crypto.randomUUID()
 }
@@ -154,6 +164,82 @@ export function buildCardsFromCsvRows(
   return {
     data: { decks, cards },
     addedDecks,
+    addedCards,
+    skippedCards,
+  }
+}
+
+export function parseAnkiTsvRows(content: string): AnkiParseResult {
+  const text = content.charCodeAt(0) === 0xFEFF ? content.slice(1) : content
+  const rows: AnkiImportRow[] = []
+  let invalidRows = 0
+
+  for (const line of text.split(/\r?\n/)) {
+    if (!line.trim()) continue
+
+    const cols = line.split('\t')
+    const front = normalizeText(cols[0] ?? '')
+    const back = normalizeText(cols[1] ?? '')
+
+    if (cols.length < 2 || !front || !back) {
+      invalidRows++
+      continue
+    }
+
+    rows.push({ front, back })
+  }
+
+  return { rows, invalidRows }
+}
+
+export function buildCardsForDeckFromAnkiRows(
+  current: AppData,
+  deckId: string,
+  rows: AnkiImportRow[],
+  now: string,
+): ImportMergeResult {
+  if (!current.decks.some((deck) => deck.id === deckId)) {
+    throw new Error('Target deck not found')
+  }
+
+  const cards = [...current.cards]
+  const existingCardKeys = createCardKeySet(cards)
+  let addedCards = 0
+  let skippedCards = 0
+
+  for (const row of rows) {
+    const front = normalizeText(row.front)
+    const back = normalizeText(row.back)
+    if (!front || !back) continue
+
+    const key = cardKey(deckId, front, back)
+    if (existingCardKeys.has(key)) {
+      skippedCards++
+      continue
+    }
+
+    cards.push({
+      id: generateId(),
+      front,
+      back,
+      deckId,
+      ease: 2.5,
+      interval: 0,
+      repetitions: 0,
+      nextReview: now,
+      lastReview: now,
+      starRating: 0,
+      mistakeCount: 0,
+      lastMistakeAt: null,
+      isMistake: false,
+    })
+    existingCardKeys.add(key)
+    addedCards++
+  }
+
+  return {
+    data: { decks: [...current.decks], cards },
+    addedDecks: 0,
     addedCards,
     skippedCards,
   }

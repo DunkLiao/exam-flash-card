@@ -2,7 +2,9 @@ import assert from 'node:assert/strict'
 import type { AppData, Card, Deck } from '../src/types/index.ts'
 import {
   buildCardsFromCsvRows,
+  buildCardsForDeckFromAnkiRows,
   mergeImportedData,
+  parseAnkiTsvRows,
 } from '../src/utils/importMerge.ts'
 
 function deck(id: string, name: string): Deck {
@@ -95,6 +97,53 @@ const current: AppData = {
   assert.equal(result.addedDecks, 1)
   assert.equal(result.addedCards, 1)
   assert.equal(result.skippedCards, 1)
+}
+
+{
+  const parsed = parseAnkiTsvRows('\uFEFFQuestion\tAnswer\n\nOnly front\n\tMissing front\nMissing back\t\nSecond\tAnswer\tIgnored tag')
+
+  assert.deepEqual(parsed.rows, [
+    { front: 'Question', back: 'Answer' },
+    { front: 'Second', back: 'Answer' },
+  ])
+  assert.equal(parsed.invalidRows, 3, 'rows without front and back should be counted as invalid')
+}
+
+{
+  const result = buildCardsForDeckFromAnkiRows(
+    current,
+    'deck-existing',
+    [
+      { front: 'Question', back: 'Answer' },
+      { front: 'Question', back: 'Answer' },
+      { front: 'New question', back: 'New answer' },
+    ],
+    '2026-07-01',
+  )
+
+  assert.equal(result.data.decks.length, 1, 'Anki import should not create decks')
+  assert.equal(result.data.cards.length, 2, 'Anki import should add only unique cards to the target deck')
+  assert.equal(result.data.cards[1].deckId, 'deck-existing')
+  assert.equal(result.addedDecks, 0)
+  assert.equal(result.addedCards, 1)
+  assert.equal(result.skippedCards, 2)
+}
+
+{
+  const result = buildCardsForDeckFromAnkiRows(
+    {
+      decks: [deck('deck-a', 'A'), deck('deck-b', 'B')],
+      cards: [card('card-a', 'deck-a', 'Same front', 'Same back')],
+    },
+    'deck-b',
+    [{ front: 'Same front', back: 'Same back' }],
+    '2026-07-01',
+  )
+
+  assert.equal(result.data.cards.length, 2, 'same Anki content may exist in different decks')
+  assert.equal(result.data.cards[1].deckId, 'deck-b')
+  assert.equal(result.addedCards, 1)
+  assert.equal(result.skippedCards, 0)
 }
 
 console.log('importMerge tests passed')
